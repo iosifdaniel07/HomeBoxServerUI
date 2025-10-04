@@ -15,11 +15,11 @@ class FilelistClient {
             // Automatically handles cookies including session IDs
             storage = AcceptAllCookiesStorage()
         }
-        
+
         // Optional: follow redirects automatically
         followRedirects = true
     }
-    
+
     /**
      * Login to filelist.io
      * @param username The username
@@ -38,10 +38,10 @@ class FilelistClient {
                 header(HttpHeaders.Referrer, "https://filelist.io/login.php?returnto=%2F")
                 header(HttpHeaders.UserAgent, "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36")
                 header("Upgrade-Insecure-Requests", "1")
-                
+
                 // Note: Browser-controlled security headers (Sec-Fetch-*) removed
                 // Note: Hardcoded PHPSESSID cookie removed (HttpCookies plugin handles this)
-                
+
                 setBody(
                     Parameters.build {
                         append("username", username)
@@ -52,11 +52,11 @@ class FilelistClient {
                     }.formUrlEncode()
                 )
             }
-            
+
             println("Status: ${response.status}")
             println("Headers: ${response.headers}")
             println("Body: ${response.bodyAsText()}")
-            
+
             // Check if login was successful (OK or redirect)
             response.status.isSuccess() || response.status == HttpStatusCode.Found
         } catch (e: Exception) {
@@ -65,7 +65,7 @@ class FilelistClient {
             false
         }
     }
-    
+
     /**
      * Get the home page content (requires prior login)
      * @return The HTML content or null on error
@@ -82,7 +82,7 @@ class FilelistClient {
             null
         }
     }
-    
+
     /**
      * Close the HTTP client and release resources
      */

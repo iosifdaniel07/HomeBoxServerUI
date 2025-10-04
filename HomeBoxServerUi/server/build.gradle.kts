@@ -24,4 +24,8 @@ dependencies {
     implementation(libs.ktor.serverAuth)
     testImplementation(libs.ktor.serverTestHost)
     testImplementation(libs.kotlin.testJunit)
+    implementation(libs.ktor.clientCore)
+    implementation(libs.ktor.clientCio)
+    implementation(libs.ktor.clientJs)
+
 }

@@ -13,6 +13,8 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import homeboxserverui.composeapp.generated.resources.Res
 import homeboxserverui.composeapp.generated.resources.myhomeBox
+import kotlinx.coroutines.MainScope
+import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.painterResource
 
 @Composable
@@ -22,6 +24,8 @@ fun LoginScreen(
     var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
+
+    val scope = MainScope()
 
     Scaffold(
         modifier = Modifier.fillMaxSize()
