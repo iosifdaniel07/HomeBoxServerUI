@@ -23,6 +23,11 @@ in your IDE’s toolbar or run it directly from the terminal:
   ```shell
   ./gradlew :server:run
   ```
+
+  ```shell
+  ./gradlew kotlinWasmUpgradeYarnLock
+  ```
+  
 - on Windows
   ```shell
   .\gradlew.bat :server:run
