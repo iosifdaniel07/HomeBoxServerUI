@@ -5,7 +5,15 @@ import io.ktor.client.plugins.cookies.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
+import org.example.project.searchData.CategoryOptions
+import org.example.project.searchData.FirstSearchResponse
+import org.example.project.searchData.SearchFiltersData
+import org.example.project.searchData.SearchInOptions
+import org.example.project.searchData.SortOptions
 import org.jsoup.Jsoup
+import org.jsoup.nodes.Document
+import org.jsoup.nodes.Element
+import org.jsoup.select.Elements
 
 /**
  * HTTP client for filelist.io login
@@ -145,7 +153,50 @@ class FilelistClient {
         }
     }
 
-    suspend fun firstSearch() {
+    fun extractSelectOptions(document: Document): SearchFiltersData {
+
+        // Extract the 'cat' select options
+        val catSelect: Element? = document.select("select[name=cat]").first()
+        val catOptions: Elements? = catSelect?.select("option")
+
+        val categories = mutableListOf<CategoryOptions>()
+        catOptions?.let {
+            for (option in catOptions) {
+                val value = option.attr("value")
+                val text = option.text()
+                categories.add(CategoryOptions(value.toInt(), text))
+            }
+        }
+
+        // Extract the 'searchin' select options
+        val searchinSelect: Element? = document.select("select[name=searchin]").first()
+        val searchinOptions: Elements? = searchinSelect?.select("option")
+
+        val searchIn = mutableListOf<SearchInOptions>()
+        searchinOptions?.let {
+            for (option in searchinOptions) {
+                val value = option.attr("value")
+                val text = option.text()
+                searchIn.add(SearchInOptions(value.toInt(), text))
+            }
+        }
+
+        // Extract the 'sort' select options
+        val sortSelect: Element? = document.select("select[name=sort]").first()
+        val sortOptions: Elements? = sortSelect?.select("option")
+
+        val sort = mutableListOf<SortOptions>()
+        sortOptions?.let {
+            for (option in sortOptions) {
+                val value = option.attr("value")
+                val text = option.text()
+                sort.add(SortOptions(value.toInt(), text))
+            }
+        }
+        return SearchFiltersData(true, categories, searchIn, sort)
+    }
+
+    suspend fun firstSearch(): FirstSearchResponse {
         try {
             val response = client.get("https://filelist.io/browse.php") {
                 header(
@@ -172,74 +223,19 @@ class FilelistClient {
                     "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36"
                 )
                 //header("Cookie", cookiesHeader)
-                header("Cookie", "PHPSESSID=apmbbir6uuvbhpol2lpiliteu8; uid=1411920; pass=d8db42735ab25cb809ab5b9ef6b07b11")
+                header(
+                    "Cookie",
+                    "PHPSESSID=apmbbir6uuvbhpol2lpiliteu8; uid=1411920; pass=d8db42735ab25cb809ab5b9ef6b07b11"
+                )
             }
             println("status" + response.status)
             println("headers:..." + response.headers)
             val document = Jsoup.parse(response.bodyAsText())
-            println(document)
-            val torrents = document.select(".torrentrow")
-            torrents.forEach { row ->
-                val title = row.select("a[title]").text()
-                println("Torrent Title: $title")
-            }
+            return FirstSearchResponse(extractSelectOptions(document), listOf())
         } catch (e: Exception) {
 
         }
-
-    }
-
-    suspend fun search(query: String): List<String>? {
-        return try {
-            // Send the request with search query as a parameter
-            val response = client.get("https://filelist.io/search.php") {
-                header(
-                    HttpHeaders.Accept,
-                    "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8"
-                )
-                header(HttpHeaders.AcceptLanguage, "en-US,en;q=0.9")
-                header("Referer", "https://filelist.io/index.php")
-                header("priority", "u=0, i")
-                header(
-                    "sec-ch-ua",
-                    "\"Brave\";v=\"141\", \"Not?A_Brand\";v=\"8\", \"Chromium\";v=\"141\""
-                )
-                header("sec-ch-ua-mobile", "?0")
-                header("sec-ch-ua-platform", "\"Linux\"")
-                header("sec-fetch-dest", "document")
-                header("sec-fetch-mode", "navigate")
-                header("sec-fetch-site", "same-origin")
-                header("sec-fetch-user", "?1")
-                header("sec-gpc", "1")
-                header("upgrade-insecure-requests", "1")
-                header(
-                    HttpHeaders.UserAgent,
-                    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36"
-                )
-                cookie(
-                    "PHPSESSID",
-                    "df4hkl784s9ba9le70hh2mdafb"
-                ) // Use the appropriate session ID cookie
-                parameter("search", query) // Pass the search query as a parameter
-            }
-
-            // Parse the HTML response
-            val html = response.bodyAsText()
-            val document = Jsoup.parse(html)
-
-            // Extract search results, assuming results are in <a> tags with a class 'result'
-            val results =
-                document.select("a.result") // Update this selector based on the actual structure of the page
-                    .map { it.text() } // Extract the text of each result
-
-            // Return the list of results
-            println("Search Results: $results")
-            results.takeIf { it.isNotEmpty() }
-
-        } catch (e: Exception) {
-            println("Error during search: ${e.message}")
-            null
-        }
+        return FirstSearchResponse(SearchFiltersData(false, listOf(), listOf(), listOf()), listOf())
     }
 
     /**
