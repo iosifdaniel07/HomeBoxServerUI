@@ -10,6 +10,5 @@ data class LoginRequest(
 
 @Serializable
 data class LoginResponse(
-    val success: Boolean,
-    val homePage: String? = null
+    val isSuccess: Boolean,
 )

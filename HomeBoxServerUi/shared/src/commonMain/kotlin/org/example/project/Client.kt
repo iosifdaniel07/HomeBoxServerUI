@@ -1,21 +1,18 @@
 package org.example.project
 
 import io.ktor.client.*
-import io.ktor.client.engine.cio.CIO
+import io.ktor.client.call.body
 import io.ktor.client.request.*
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.http.ContentType
 import io.ktor.http.contentType
 import io.ktor.serialization.kotlinx.json.*
-import io.ktor.client.*
 import io.ktor.client.engine.cio.*
-import io.ktor.client.request.*
 import io.ktor.client.statement.HttpResponse
-import io.ktor.http.*
-import kotlinx.coroutines.*
+
 
 // Shared class to handle API calls in common code
-class Client {
+object Client {
     val client = HttpClient{//(CIO) {
         install(ContentNegotiation) {
             json()
@@ -23,13 +20,20 @@ class Client {
     }
 
     suspend fun login(username: String, password: String): LoginResponse {
-        client.post("http://localhost:8085/login") {
+        val response: LoginResponse = client.post("http://localhost:8085/login") {
             contentType(ContentType.Application.Json)
             setBody(LoginRequest(username, password))
-        }
-        return LoginResponse(success = false, homePage = null)
+        }.body()
+        return response
     }
 
+    suspend fun search(query: String): SearchResponse {
+        val response: SearchResponse =  client.post("http://localhost:8085/search") {
+            contentType(ContentType.Application.Json)
+            setBody(SearchRequest(query))
+        }.body()
+        return response
+    }
 
     // Clean up resources when done
     fun close() {

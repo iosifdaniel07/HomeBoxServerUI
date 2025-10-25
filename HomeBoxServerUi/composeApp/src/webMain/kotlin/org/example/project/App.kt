@@ -21,6 +21,8 @@ import org.jetbrains.compose.resources.painterResource
 import homeboxserverui.composeapp.generated.resources.Res
 import homeboxserverui.composeapp.generated.resources.compose_multiplatform
 import homeboxserverui.composeapp.generated.resources.myhomeBox
+import homeboxserverui.composeapp.generated.resources.search
+import kotlinx.coroutines.launch
 
 enum class Screen {
     LOGIN,
@@ -40,14 +42,16 @@ fun App() {
     ) {
         var currentScreen by remember { mutableStateOf(Screen.LOGIN) }
         var loggedInUser by remember { mutableStateOf("") }
-        
+
         when (currentScreen) {
             Screen.LOGIN -> {
                 LoginScreen { username, password ->
+                    println("Current scren: Home")
                     loggedInUser = username
                     currentScreen = Screen.HOME
                 }
             }
+
             Screen.HOME -> {
                 HomeScreen(username = loggedInUser) {
                     currentScreen = Screen.LOGIN
@@ -61,6 +65,8 @@ fun App() {
 @Composable
 fun HomeScreen(username: String, onLogout: () -> Unit) {
     // Sample data for demonstration
+    val client = Client
+    val scope = rememberCoroutineScope()                        // ← prefer this over MainScope()
     val allItems = remember {
         listOf(
             ItemCard(1, "Smart Bulb"),
@@ -75,9 +81,9 @@ fun HomeScreen(username: String, onLogout: () -> Unit) {
             ItemCard(10, "Smart Plug")
         )
     }
-    
+
     var searchQuery by remember { mutableStateOf("") }
-    
+
     // Filter items based on search query
     val filteredItems = remember(searchQuery) {
         if (searchQuery.isBlank()) {
@@ -86,7 +92,7 @@ fun HomeScreen(username: String, onLogout: () -> Unit) {
             allItems.filter { it.title.contains(searchQuery, ignoreCase = true) }
         }
     }
-    
+
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         topBar = {
@@ -109,18 +115,41 @@ fun HomeScreen(username: String, onLogout: () -> Unit) {
                         Text("Logout")
                     }
                 }
-                
+
                 Spacer(Modifier.height(16.dp))
-                
-                // Search bar
-                OutlinedTextField(
-                    value = searchQuery,
-                    onValueChange = { searchQuery = it },
+
+                // Search bar with simple button for search
+                Row(
                     modifier = Modifier.fillMaxWidth(),
-                    placeholder = { Text("Search items...") },
-                    singleLine = true,
-                    shape = MaterialTheme.shapes.medium
-                )
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    OutlinedTextField(
+                        value = searchQuery,
+                        onValueChange = { searchQuery = it },
+                        modifier = Modifier.weight(1f),
+                        placeholder = { Text("Search items...") },
+                        singleLine = true,
+                        shape = MaterialTheme.shapes.medium
+                    )
+
+                    // Simple search button
+                    Button(
+                        onClick = {
+                            println("Search query: $searchQuery")
+                            scope.launch {
+                                val result = client.search(searchQuery)
+                                println("Search result: $result")
+                            }
+                        },
+                        modifier = Modifier.padding(start = 2.dp).size(70.dp)
+                    ) {
+                        Icon(
+                            painter = painterResource(Res.drawable.search),
+                            contentDescription = "Search",
+                            modifier = Modifier.size(50.dp)
+                        )
+                    }
+                }
             }
         }
     ) { paddingValues ->
@@ -164,7 +193,7 @@ fun ItemCardView(item: ItemCard) {
                     .padding(8.dp),
                 contentScale = ContentScale.Fit
             )
-            
+
             // Title
             Text(
                 text = item.title,

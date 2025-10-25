@@ -31,4 +31,5 @@ dependencies {
     implementation(libs.ktor.clientCore)
     implementation(libs.ktor.clientCio)
     implementation("ch.qos.logback:logback-classic:1.2.10")
+    implementation("org.jsoup:jsoup:1.15.3")
 }

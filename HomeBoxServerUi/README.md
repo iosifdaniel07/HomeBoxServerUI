@@ -27,6 +27,10 @@ in your IDE’s toolbar or run it directly from the terminal:
   ```shell
   ./gradlew kotlinWasmUpgradeYarnLock
   ```
+
+  ```shell
+  ./gradlew run
+  ```
   
 - on Windows
   ```shell

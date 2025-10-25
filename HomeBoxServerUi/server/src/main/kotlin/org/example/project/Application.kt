@@ -32,24 +32,23 @@ fun Application.module() {
 
     routing {
 
-        route("/hello", HttpMethod.Get) {
-            log.info("Received request for /get")
-            handle {
-                call.respondText("Hello")
-            }
-        }
-
         get("/get") {
             call.respondText("Server is running!", ContentType.Text.Plain)
         }
 
         post("/login") {
             val loginRequest = call.receive<LoginRequest>()
-            
+
             // First, attempt login
             val success = client.login(loginRequest.username, loginRequest.password)
-            
-            call.respond(LoginResponse(success, client.getHomePage()))
+            call.respond(HttpStatusCode.OK, LoginResponse(success))
+        }
+
+        post("/search") {
+            val query = call.receive<SearchRequest>().query
+            val results = client.firstSearch()
+            println("search here : ${query}")
+            call.respond(HttpStatusCode.OK, SearchResponse(results.toString()))
         }
     }
 }

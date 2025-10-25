@@ -13,12 +13,8 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import homeboxserverui.composeapp.generated.resources.Res
 import homeboxserverui.composeapp.generated.resources.myhomeBox
-import kotlinx.browser.window
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.painterResource
-import org.w3c.fetch.Headers
-import org.w3c.fetch.RequestInit
-import org.w3c.fetch.Response
 
 @Composable
 fun LoginScreen(onLogin: (String, String) -> Unit) {
@@ -27,7 +23,7 @@ fun LoginScreen(onLogin: (String, String) -> Unit) {
     var error by remember { mutableStateOf<String?>(null) }
     var status by remember { mutableStateOf<String?>(null) }   // ← UI feedback
     val scope = rememberCoroutineScope()                        // ← prefer this over MainScope()
-    val client = Client()
+    val client = Client
 
     Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
         Column(
@@ -78,9 +74,13 @@ fun LoginScreen(onLogin: (String, String) -> Unit) {
                         status = "Logging in…"
                         scope.launch {
                             print("start loggin")
-                            val response = client.getServerStatus()//login(username, password)//
+                            val response = client.login(username, password).isSuccess//getServerStatus()//
                             print("end loggin ${response}")
-
+                            if(response){
+                                onLogin(username, password)
+                            } else {
+                                status = "Login failed"
+                            }
                         }
                     }
                 },
