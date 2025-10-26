@@ -12,9 +12,11 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.wrapContentWidth
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -38,7 +40,7 @@ import org.example.project.searchData.CategoryOptions
 import org.example.project.searchData.FirstSearchResponse
 import org.example.project.searchData.SearchFilters
 import org.example.project.searchData.SearchInOptions
-import org.example.project.searchData.SearchResponse
+import org.example.project.searchData.SearchItem
 import org.example.project.searchData.SortOptions
 import org.jetbrains.compose.resources.painterResource
 
@@ -52,7 +54,7 @@ fun HomeScreen(username: String, onLogout: () -> Unit) {
     var searchInOptions by remember { mutableStateOf<MutableList<SearchInOptions>>(mutableListOf()) }
     var categoryOptions by remember { mutableStateOf<MutableList<CategoryOptions>>(mutableListOf()) }
     var sortOptions by remember { mutableStateOf<MutableList<SortOptions>>(mutableListOf()) }
-
+    var searchItems by remember { mutableStateOf<List<SearchItem>>(mutableListOf()) }
 
     // Call the API when the page opens
     LaunchedEffect(Unit) {
@@ -67,36 +69,15 @@ fun HomeScreen(username: String, onLogout: () -> Unit) {
             firstSearch?.searchFiltersData?.sortOptionsList?.let {
                 sortOptions = it.toMutableList()
             }
+            firstSearch?.searchItems?.let {
+                searchItems = it.toMutableList()
+            }
         } catch (e: Exception) {
 
         }
     }
 
-    val allItems = remember {
-        listOf(
-            ItemCard(1, "Smart Bulb"),
-            ItemCard(2, "Temperature Sensor"),
-            ItemCard(3, "Door Lock"),
-            ItemCard(4, "Security Camera"),
-            ItemCard(5, "Motion Detector"),
-            ItemCard(6, "Smart Thermostat"),
-            ItemCard(7, "Light Switch"),
-            ItemCard(8, "Smoke Detector"),
-            ItemCard(9, "Water Leak Sensor"),
-            ItemCard(10, "Smart Plug")
-        )
-    }
-
     var searchQuery by remember { mutableStateOf("") }
-
-    // Filter items based on search query
-    val filteredItems = remember(searchQuery) {
-        if (searchQuery.isBlank()) {
-            allItems
-        } else {
-            allItems.filter { it.title.contains(searchQuery, ignoreCase = true) }
-        }
-    }
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -184,17 +165,16 @@ fun HomeScreen(username: String, onLogout: () -> Unit) {
         }
     ) { paddingValues ->
         // Vertical grid of cards
-        LazyVerticalGrid(
-            columns = GridCells.Adaptive(minSize = 200.dp),
+        LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .padding(horizontal = 16.dp),
+                .padding(horizontal = 300.dp),
             contentPadding = PaddingValues(vertical = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally // Align cards horizontally in the center
         ) {
-            items(filteredItems) { item ->
+          items(searchItems) { item ->
                 ItemCardView(item)
             }
         }

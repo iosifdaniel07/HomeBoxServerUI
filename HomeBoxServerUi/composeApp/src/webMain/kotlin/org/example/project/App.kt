@@ -8,12 +8,6 @@ enum class Screen {
     HOME
 }
 
-data class ItemCard(
-    val id: Int,
-    val title: String,
-    val imageRes: String = "myhomeBox"
-)
-
 @Composable
 fun App() {
     MaterialTheme(
