@@ -58,23 +58,23 @@ fun HomeScreen(username: String, onLogout: () -> Unit) {
 
     // Call the API when the page opens
     LaunchedEffect(Unit) {
-        try {
-            firstSearch = client.firstSearch()
-            firstSearch?.searchFiltersData?.searchInOptionsList?.let {
-                searchInOptions = it.toMutableList()
-            }
-            firstSearch?.searchFiltersData?.categoryOptionsList?.let {
-                categoryOptions = it.toMutableList()
-            }
-            firstSearch?.searchFiltersData?.sortOptionsList?.let {
-                sortOptions = it.toMutableList()
-            }
-            firstSearch?.searchItems?.let {
-                searchItems = it.toMutableList()
-            }
-        } catch (e: Exception) {
+        /* try {
+             firstSearch = client.firstSearch()
+             firstSearch?.searchFiltersData?.searchInOptionsList?.let {
+                 searchInOptions = it.toMutableList()
+             }
+             firstSearch?.searchFiltersData?.categoryOptionsList?.let {
+                 categoryOptions = it.toMutableList()
+             }
+             firstSearch?.searchFiltersData?.sortOptionsList?.let {
+                 sortOptions = it.toMutableList()
+             }
+             firstSearch?.searchItems?.let {
+                 searchItems = it.toMutableList()
+             }
+         } catch (e: Exception) {
 
-        }
+         }*/
     }
 
     var searchQuery by remember { mutableStateOf("") }
@@ -104,29 +104,37 @@ fun HomeScreen(username: String, onLogout: () -> Unit) {
 
                 Spacer(Modifier.height(16.dp))
 
-                Row(
-                    modifier = Modifier.wrapContentWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(2),  // Defines a 2-column grid
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(8.dp),  // Ensures the grid takes full width and adds padding
+                    contentPadding = PaddingValues(8.dp) // Padding between items
                 ) {
-                    DropdownMenuView(
-                        SearchFilters.SearchInOptions.name, searchInOptions.map { it.text },
-                        onFilterSelected = { searchInOption ->
-                            //TODO....
-                        }
-                    )
-                    DropdownMenuView(
-                        SearchFilters.CategoryOptions.name, categoryOptions.map { it.text },
-                        onFilterSelected = { categoryOptions ->
-                            //TODO....
-                        }
-                    )
-                    DropdownMenuView(
-                        SearchFilters.SortOptions.name, sortOptions.map { it.text },
-                        onFilterSelected = { categoryOptions ->
-                            //TODO....
-                        }
-                    )
+                    item {
+                        DropdownMenuView(
+                            SearchFilters.SearchInOptions.name, searchInOptions.map { it.text },
+                            onFilterSelected = { searchInOption ->
+                                //TODO....
+                            }
+                        )
+                    }
+                    item {
+                        DropdownMenuView(
+                            SearchFilters.CategoryOptions.name, categoryOptions.map { it.text },
+                            onFilterSelected = { categoryOptions ->
+                                //TODO....
+                            }
+                        )
+                    }
+                    item {
+                        DropdownMenuView(
+                            SearchFilters.SortOptions.name, sortOptions.map { it.text },
+                            onFilterSelected = { categoryOptions ->
+                                //TODO....
+                            }
+                        )
+                    }
                 }
 
                 // Search bar with simple button for search
@@ -148,8 +156,8 @@ fun HomeScreen(username: String, onLogout: () -> Unit) {
                         onClick = {
                             println("Search query: $searchQuery")
                             scope.launch {
-                                val result = client.search(searchQuery)
-                                println("Search result: $result")
+                                //val result = client.search(searchQuery)
+                                // println("Search result: $result")
                             }
                         },
                         modifier = Modifier.padding(start = 2.dp).size(70.dp)
@@ -164,19 +172,19 @@ fun HomeScreen(username: String, onLogout: () -> Unit) {
             }
         }
     ) { paddingValues ->
-        // Vertical grid of cards
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .padding(horizontal = 300.dp),
-            contentPadding = PaddingValues(vertical = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally // Align cards horizontally in the center
-        ) {
-          items(searchItems) { item ->
-                ItemCardView(item)
-            }
-        }
+         //Vertical grid of cards
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(paddingValues)
+                        .padding(horizontal = 300.dp),
+                    contentPadding = PaddingValues(vertical = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally // Align cards horizontally in the center
+                ) {
+                  items(searchItems) { item ->
+                        ItemCardView(item)
+                    }
+                }
     }
 }

@@ -28,9 +28,9 @@ fun DropdownMenuView(
     var expanded by remember { mutableStateOf(false) }
     var selectedOption by remember { mutableStateOf(NON_SELECTED) }
 
-    Row(
+    Column(
         modifier = Modifier.wrapContentWidth(),
-        verticalAlignment = Alignment.CenterVertically
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(text = "$filterName:")
         Column(modifier = Modifier.padding(16.dp)) {
