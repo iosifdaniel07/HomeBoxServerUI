@@ -131,7 +131,10 @@ fun HomeScreen(username: String, onLogout: () -> Unit) {
                             SearchFilters.CategoryOptions.name,
                             categoryOptions.map { it.text },
                             selectedCategory?.text,
-                            onFilterSelected = { /* TODO */ }
+                            onFilterSelected = {
+                                selectedCategory =
+                                    categoryOptions.find { it.text == selectedCategory?.text }
+                            }
                         )
                     }
                     key(selectedSearchIn?.text) {
@@ -139,7 +142,10 @@ fun HomeScreen(username: String, onLogout: () -> Unit) {
                             SearchFilters.SearchInOptions.name,
                             searchInOptions.map { it.text },
                             selectedSearchIn?.text,
-                            onFilterSelected = { /* TODO */ }
+                            onFilterSelected = {
+                                selectedSearchIn =
+                                    searchInOptions.find { it.text == selectedSearchIn?.text }
+                            }
                         )
                     }
                     key(selectedSort?.text) {
@@ -147,7 +153,9 @@ fun HomeScreen(username: String, onLogout: () -> Unit) {
                             SearchFilters.SortOptions.name,
                             sortOptions.map { it.text },
                             selectedSort?.text,
-                            onFilterSelected = { /* TODO */ }
+                            onFilterSelected = {
+                                selectedSort = sortOptions.find { it.text == selectedSort?.text }
+                            }
                         )
                     }
                 }
