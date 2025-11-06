@@ -22,6 +22,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -51,18 +52,24 @@ fun HomeScreen(username: String, onLogout: () -> Unit) {
     var categoryOptions by remember { mutableStateOf<MutableList<CategoryOptions>>(mutableListOf()) }
     var sortOptions by remember { mutableStateOf<MutableList<SortOptions>>(mutableListOf()) }
     var searchItems by remember { mutableStateOf<List<SearchItem>>(mutableListOf()) }
+    var selectedCategory by remember { mutableStateOf<CategoryOptions?>(null) }
+    var selectedSearchIn by remember { mutableStateOf<SearchInOptions?>(null) }
+    var selectedSort by remember { mutableStateOf<SortOptions?>(null) }
 
     suspend fun loadInitialData() {
         try {
             firstSearch = client.firstSearch()
-            firstSearch?.searchFiltersData?.searchInOptionsList?.let {
-                searchInOptions = it.toMutableList()
+            firstSearch?.searchFiltersData?.let {
+                searchInOptions = it.searchInOptionsList.toMutableList()
+                selectedSearchIn = it.selectedSearchIn ?: searchInOptions.firstOrNull()
             }
-            firstSearch?.searchFiltersData?.categoryOptionsList?.let {
-                categoryOptions = it.toMutableList()
+            firstSearch?.searchFiltersData?.let {
+                categoryOptions = it.categoryOptionsList.toMutableList()
+                selectedCategory = it.selectedCategory ?: categoryOptions.firstOrNull()
             }
-            firstSearch?.searchFiltersData?.sortOptionsList?.let {
-                sortOptions = it.toMutableList()
+            firstSearch?.searchFiltersData?.let {
+                sortOptions = it.sortOptionsList.toMutableList()
+                selectedSort = it.selectedSort ?: sortOptions.firstOrNull()
             }
             firstSearch?.searchItems?.let {
                 searchItems = it.toMutableList()
@@ -119,21 +126,30 @@ fun HomeScreen(username: String, onLogout: () -> Unit) {
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    DropdownMenuView(
-                        SearchFilters.SearchInOptions.name,
-                        searchInOptions.map { it.text },
-                        onFilterSelected = { /* TODO */ }
-                    )
-                    DropdownMenuView(
-                        SearchFilters.CategoryOptions.name,
-                        categoryOptions.map { it.text },
-                        onFilterSelected = { /* TODO */ }
-                    )
-                    DropdownMenuView(
-                        SearchFilters.SortOptions.name,
-                        sortOptions.map { it.text },
-                        onFilterSelected = { /* TODO */ }
-                    )
+                    key(selectedCategory?.text) {
+                        DropdownMenuView(
+                            SearchFilters.CategoryOptions.name,
+                            categoryOptions.map { it.text },
+                            selectedCategory?.text,
+                            onFilterSelected = { /* TODO */ }
+                        )
+                    }
+                    key(selectedSearchIn?.text) {
+                        DropdownMenuView(
+                            SearchFilters.SearchInOptions.name,
+                            searchInOptions.map { it.text },
+                            selectedSearchIn?.text,
+                            onFilterSelected = { /* TODO */ }
+                        )
+                    }
+                    key(selectedSort?.text) {
+                        DropdownMenuView(
+                            SearchFilters.SortOptions.name,
+                            sortOptions.map { it.text },
+                            selectedSort?.text,
+                            onFilterSelected = { /* TODO */ }
+                        )
+                    }
                 }
             }
 

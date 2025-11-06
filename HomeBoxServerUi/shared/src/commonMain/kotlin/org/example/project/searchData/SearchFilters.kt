@@ -22,6 +22,9 @@ data class SearchFiltersData(
     val isSuccessful: Boolean,
     val categoryOptionsList: List<CategoryOptions>,
     val searchInOptionsList: List<SearchInOptions>,
-    val sortOptionsList: List<SortOptions>
+    val sortOptionsList: List<SortOptions>,
+    val selectedCategory: CategoryOptions?,
+    val selectedSearchIn: SearchInOptions?,
+    val selectedSort: SortOptions?
 )
 

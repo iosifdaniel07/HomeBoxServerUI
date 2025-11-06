@@ -82,10 +82,14 @@ fun extractSelectOptions(document: Document): SearchFiltersData {
     val catOptions: Elements? = catSelect?.select("option")
 
     val categories = mutableListOf<CategoryOptions>()
+    var selectedCategory: CategoryOptions? = null
     catOptions?.let {
         for (option in catOptions) {
             val value = option.attr("value")
             val text = option.text()
+            if (option.attr("selected").isNotEmpty()) {
+                selectedCategory = CategoryOptions(value.toInt(), text)
+            }
             categories.add(CategoryOptions(value.toInt(), text))
         }
     }
@@ -93,12 +97,15 @@ fun extractSelectOptions(document: Document): SearchFiltersData {
     // Extract the 'searchin' select options
     val searchinSelect: Element? = document.select("select[name=searchin]").first()
     val searchinOptions: Elements? = searchinSelect?.select("option")
-
+    var selectedSearchIn: SearchInOptions? = null
     val searchIn = mutableListOf<SearchInOptions>()
     searchinOptions?.let {
         for (option in searchinOptions) {
             val value = option.attr("value")
             val text = option.text()
+            if (option.attr("selected").isNotEmpty()) {
+                selectedSearchIn = SearchInOptions(value.toInt(), text)
+            }
             searchIn.add(SearchInOptions(value.toInt(), text))
         }
     }
@@ -108,14 +115,18 @@ fun extractSelectOptions(document: Document): SearchFiltersData {
     val sortOptions: Elements? = sortSelect?.select("option")
 
     val sort = mutableListOf<SortOptions>()
+    var selectedSort: SortOptions? = null
     sortOptions?.let {
         for (option in sortOptions) {
             val value = option.attr("value")
             val text = option.text()
+            if (option.attr("selected").isNotEmpty()) {
+                selectedSort = SortOptions(value.toInt(), text)
+            }
             sort.add(SortOptions(value.toInt(), text))
         }
     }
-    return SearchFiltersData(true, categories, searchIn, sort)
+    return SearchFiltersData(true, categories, searchIn, sort, selectedCategory, selectedSearchIn, selectedSort)
 }
 
 fun extractTorrentClasses(document: Document): List<SearchItem> {

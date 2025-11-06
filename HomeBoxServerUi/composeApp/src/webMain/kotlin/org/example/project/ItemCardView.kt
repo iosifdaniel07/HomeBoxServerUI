@@ -144,6 +144,15 @@ fun ItemCardView(item: SearchItem) {
                         DividerDefaults.Thickness,
                         DividerDefaults.color
                     )
+
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        /* TextButton(onClick = { /* open details */ }) {
+                             Text("Details")
+                         }*/
+                        TextButton(onClick = { /* start download */ }) {
+                            Text("Download")
+                        }
+                    }
                 }
             }
 
@@ -156,21 +165,6 @@ fun ItemCardView(item: SearchItem) {
                     .wrapContentHeight(),
                 textAlign = TextAlign.Center
             )
-
-            HorizontalDivider(
-                Modifier.padding(vertical = 2.dp).width(400.dp),
-                DividerDefaults.Thickness,
-                DividerDefaults.color
-            )
-
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                /* TextButton(onClick = { /* open details */ }) {
-                     Text("Details")
-                 }*/
-                TextButton(onClick = { /* start download */ }) {
-                    Text("Download")
-                }
-            }
         }
 
     }
