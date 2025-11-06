@@ -17,6 +17,8 @@ import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DividerDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -63,7 +65,7 @@ fun ItemCardView(item: SearchItem) {
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     if (item.imageUrl.isBlank()) {
-                        PosterPlaceholder()
+                        PosterPlaceholder(text = item.imageCategory ?: NO_IMAGE)
                     } else {
                         AsyncImage(
                             modifier = Modifier
@@ -105,22 +107,46 @@ fun ItemCardView(item: SearchItem) {
                         )
                     }
 
+                    HorizontalDivider(
+                        Modifier.padding(vertical = 2.dp),
+                        DividerDefaults.Thickness,
+                        DividerDefaults.color
+                    )
+
                     Text(
-                        text = "ID: ${item.id}",
+                        text = "Uploaded date",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Text(
+                        text = "${item.uploadedDate}",
                         style = MaterialTheme.typography.bodySmall
                     )
 
-                    // Example: a row of actions
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        TextButton(onClick = { /* open details */ }) {
-                            Text("Details")
-                        }
-                        TextButton(onClick = { /* start download */ }) {
-                            Text("Download")
-                        }
-                    }
+                    HorizontalDivider(
+                        Modifier.padding(vertical = 2.dp),
+                        DividerDefaults.Thickness,
+                        DividerDefaults.color
+                    )
+
+                    Text(
+                        text = "Size",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Text(
+                        text = "Size: ${item.size}",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+
+                    HorizontalDivider(
+                        Modifier.padding(vertical = 2.dp),
+                        DividerDefaults.Thickness,
+                        DividerDefaults.color
+                    )
                 }
             }
+
             Text(
                 text = item.title,
                 style = MaterialTheme.typography.titleMedium,
@@ -130,13 +156,28 @@ fun ItemCardView(item: SearchItem) {
                     .wrapContentHeight(),
                 textAlign = TextAlign.Center
             )
+
+            HorizontalDivider(
+                Modifier.padding(vertical = 2.dp).width(400.dp),
+                DividerDefaults.Thickness,
+                DividerDefaults.color
+            )
+
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                /* TextButton(onClick = { /* open details */ }) {
+                     Text("Details")
+                 }*/
+                TextButton(onClick = { /* start download */ }) {
+                    Text("Download")
+                }
+            }
         }
 
     }
 }
 
 @Composable
-fun PosterPlaceholder(modifier: Modifier = Modifier, text: String = "NO IMAGE") {
+fun PosterPlaceholder(modifier: Modifier = Modifier, text: String) {
     Box(
         modifier = modifier
             .aspectRatio(185f / 278f) // same shape as 185x278
@@ -151,3 +192,5 @@ fun PosterPlaceholder(modifier: Modifier = Modifier, text: String = "NO IMAGE") 
         )
     }
 }
+
+val NO_IMAGE = "NO IMAGE"

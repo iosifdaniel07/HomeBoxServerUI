@@ -135,13 +135,33 @@ fun extractTorrentClasses(document: Document): List<SearchItem> {
             val detailLink = torrentTableDivLeft?.select("a")?.attr("href")
             val torrentTitle = torrentTableDivLeft?.select("a")?.attr("title")
             val id = getIdFromDetailLink(detailLink ?: "")
-            val categories =  torrentTableDivLeft
+            val categories = torrentTableDivLeft
                 ?.selectFirst("font.small")
                 ?.text()
                 ?.trim()
 
+            val imageAlt = torrentRow.select("div.torrenttable[align='center']").first()
+                ?.select("div.torrenttable span a img")  // Select the img inside the a tag inside the span
+                ?.attr("alt")
+
+            val dateSizeElements = torrentRow.select("div.torrenttable[align='center']")
+                .select("div.torrenttable span font.small")  // Select the <font class='small'>
+            val date = dateSizeElements.getOrNull(1)?.text()?.trim()
+            val size = dateSizeElements.getOrNull(2)?.text()?.trim()
+
             if (torrentTitle != null && imageUrl != null && detailLink != null && id != null && categories != null)
-                searchItemList.add(SearchItem(torrentTitle, imageUrl, detailLink, id, categories))
+                searchItemList.add(
+                    SearchItem(
+                        torrentTitle,
+                        imageUrl,
+                        detailLink,
+                        id,
+                        categories,
+                        imageAlt,
+                        size,
+                        date
+                    )
+                )
         }
     }
     return searchItemList
