@@ -60,6 +60,8 @@ fun HomeScreen(username: String, onLogout: () -> Unit) {
     var selectedCategory by remember { mutableStateOf<CategoryOptions?>(null) }
     var selectedSearchIn by remember { mutableStateOf<SearchInOptions?>(null) }
     var selectedSort by remember { mutableStateOf<SortOptions?>(null) }
+    var selectedPage = 1
+    var pagesPair by remember { mutableStateOf(Pair(1, 1)) }
 
     suspend fun loadInitialData() {
         try {
@@ -67,6 +69,8 @@ fun HomeScreen(username: String, onLogout: () -> Unit) {
             firstSearch?.searchFiltersData?.let {
                 searchInOptions = it.searchInOptionsList.toMutableList()
                 selectedSearchIn = it.selectedSearchIn ?: searchInOptions.firstOrNull()
+                pagesPair = it.firstLastPage
+                println(pagesPair)
             }
             firstSearch?.searchFiltersData?.let {
                 categoryOptions = it.categoryOptionsList.toMutableList()
@@ -198,14 +202,17 @@ fun HomeScreen(username: String, onLogout: () -> Unit) {
                     }
                 }
             }
-            item {
-                Pager(
-                    totalPages = 25, //todo: testt
-                    initialPage = 1,
-                    onPageChange = { newPage ->
 
-                    }
-                )
+            item {
+                key(pagesPair) {
+                    Pager(
+                        totalPages = pagesPair.second,
+                        initialPage = selectedPage,
+                        onPageChange = { newPage ->
+
+                        }
+                    )
+                }
             }
 
             // Results list
@@ -220,6 +227,18 @@ fun HomeScreen(username: String, onLogout: () -> Unit) {
                         .padding(horizontal = 16.dp)
                 ) {
                     ItemCardView(item)
+                }
+            }
+
+            item {
+                key(pagesPair) {
+                    Pager(
+                        totalPages = pagesPair.second,
+                        initialPage = selectedPage,
+                        onPageChange = { newPage ->
+
+                        }
+                    )
                 }
             }
         }
