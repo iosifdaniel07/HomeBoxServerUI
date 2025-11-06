@@ -78,7 +78,7 @@ fun Pager(
     ) {
         Row(
             horizontalArrangement = Arrangement.Center,
-            modifier = Modifier.padding(8.dp)
+            modifier = Modifier.padding(2.dp)
         ) {
             // Show "1..." if the first visible page is greater than 1 and make "1" clickable
             if (startPage > 1) {
@@ -87,7 +87,7 @@ fun Pager(
                     colors = ButtonDefaults.buttonColors(
                         containerColor = if (1 == currentPage) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface
                     ),
-                    modifier = Modifier.padding(4.dp)//.shadow(elevation = 2.dp)
+                    modifier = Modifier.padding(3.dp)//.shadow(elevation = 2.dp)
                 ) {
                     Text("1", style = MaterialTheme.typography.bodyMedium, color = Color.White)
                 }
@@ -130,7 +130,7 @@ fun Pager(
                         containerColor = Color.Transparent // No background
                     ),
                     modifier = Modifier
-                        .padding(4.dp)
+                        .padding(3.dp)
                         .then(
                             if (totalPages == currentPage) {
                                 Modifier.border(

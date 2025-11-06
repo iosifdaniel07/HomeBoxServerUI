@@ -188,6 +188,7 @@ fun extractTorrentClasses(document: Document): List<SearchItem> {
     return searchItemList
 }
 
+//first page is the first search....page 2 is page=1, will need to handle +1
 fun extractPageNumbers(document: Document): Pair<Int, Int> {
     val firstPage =
         document.select("div.pager > span > a").first()?.attr("href")?.substringAfter("page=")
@@ -196,7 +197,7 @@ fun extractPageNumbers(document: Document): Pair<Int, Int> {
     val lastPage =
         document.select("div.pager > span > a").last()?.attr("href")?.substringAfter("page=")
             ?.toIntOrNull() ?: 1
-    return Pair(firstPage, lastPage)
+    return Pair(firstPage, lastPage + 1)
 }
 
 fun getIdFromDetailLink(link: String): String? {

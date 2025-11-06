@@ -70,7 +70,6 @@ fun HomeScreen(username: String, onLogout: () -> Unit) {
                 searchInOptions = it.searchInOptionsList.toMutableList()
                 selectedSearchIn = it.selectedSearchIn ?: searchInOptions.firstOrNull()
                 pagesPair = it.firstLastPage
-                println(pagesPair)
             }
             firstSearch?.searchFiltersData?.let {
                 categoryOptions = it.categoryOptionsList.toMutableList()
