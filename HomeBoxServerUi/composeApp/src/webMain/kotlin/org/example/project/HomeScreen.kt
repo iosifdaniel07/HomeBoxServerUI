@@ -35,7 +35,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import homeboxserverui.composeapp.generated.resources.Res
 import homeboxserverui.composeapp.generated.resources.search
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.example.project.searchData.CategoryOptions
 import org.example.project.searchData.FirstSearchResponse
 import org.example.project.searchData.SearchFilters
@@ -56,25 +59,29 @@ fun HomeScreen(username: String, onLogout: () -> Unit) {
     var sortOptions by remember { mutableStateOf<MutableList<SortOptions>>(mutableListOf()) }
     var searchItems by remember { mutableStateOf<List<SearchItem>>(mutableListOf()) }
 
+    suspend fun loadInitialData(){
+        try {
+            firstSearch = client.firstSearch()
+            firstSearch?.searchFiltersData?.searchInOptionsList?.let {
+                searchInOptions = it.toMutableList()
+            }
+            firstSearch?.searchFiltersData?.categoryOptionsList?.let {
+                categoryOptions = it.toMutableList()
+            }
+            firstSearch?.searchFiltersData?.sortOptionsList?.let {
+                sortOptions = it.toMutableList()
+            }
+            firstSearch?.searchItems?.let {
+                searchItems = it.toMutableList()
+            }
+        } catch (e: Exception) {
+
+        }
+    }
+
     // Call the API when the page opens
     LaunchedEffect(Unit) {
-        /* try {
-             firstSearch = client.firstSearch()
-             firstSearch?.searchFiltersData?.searchInOptionsList?.let {
-                 searchInOptions = it.toMutableList()
-             }
-             firstSearch?.searchFiltersData?.categoryOptionsList?.let {
-                 categoryOptions = it.toMutableList()
-             }
-             firstSearch?.searchFiltersData?.sortOptionsList?.let {
-                 sortOptions = it.toMutableList()
-             }
-             firstSearch?.searchItems?.let {
-                 searchItems = it.toMutableList()
-             }
-         } catch (e: Exception) {
-
-         }*/
+        loadInitialData()
     }
 
     var searchQuery by remember { mutableStateOf("") }

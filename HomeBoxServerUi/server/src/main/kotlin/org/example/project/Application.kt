@@ -55,6 +55,7 @@ fun Application.module() {
         }*/
 
         get("/firstSearch") {
+            println("first search")
             val results = client.firstSearch()
             call.respond(HttpStatusCode.OK, results)
         }

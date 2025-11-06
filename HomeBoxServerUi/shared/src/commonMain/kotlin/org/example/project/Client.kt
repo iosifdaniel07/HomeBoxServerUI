@@ -21,7 +21,7 @@ object Client {
     }
 
     suspend fun login(username: String, password: String): LoginResponse {
-        val response: LoginResponse = client.post("http://localhost:8085/login") {
+        val response: LoginResponse = client.post("http://192.168.1.139:8085/login") {
             contentType(ContentType.Application.Json)
             setBody(LoginRequest(username, password))
         }.body()
@@ -29,7 +29,7 @@ object Client {
     }
 
     suspend fun search(query: String): SearchResponse {
-        val response: SearchResponse =  client.post("http://localhost:8085/search") {
+        val response: SearchResponse =  client.post("http://192.168.1.139:8085/search") {
             contentType(ContentType.Application.Json)
             setBody(SearchRequest(query))
         }.body()
@@ -37,7 +37,7 @@ object Client {
     }
 
     suspend fun firstSearch(): FirstSearchResponse {
-        val response: FirstSearchResponse =  client.get("http://localhost:8085/firstSearch").body()
+        val response: FirstSearchResponse =  client.get("http://192.168.1.139:8085/firstSearch").body()
         return response
     }
 
