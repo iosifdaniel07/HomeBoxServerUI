@@ -1,6 +1,5 @@
 package org.example.project
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -10,10 +9,7 @@ import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentHeight
@@ -30,13 +26,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
-import homeboxserverui.composeapp.generated.resources.Res
-import homeboxserverui.composeapp.generated.resources.myhomeBox
 import org.example.project.searchData.SearchItem
-import org.jetbrains.compose.resources.painterResource
 
 @Composable
 fun ItemCardView(item: SearchItem) {
@@ -74,9 +66,12 @@ fun ItemCardView(item: SearchItem) {
                         PosterPlaceholder()
                     } else {
                         AsyncImage(
+                            modifier = Modifier
+                                .aspectRatio(185f / 278f),
                             model = item.imageUrl,
                             contentDescription = null,
                             contentScale = ContentScale.Crop
+
                         )
                     }
                 }

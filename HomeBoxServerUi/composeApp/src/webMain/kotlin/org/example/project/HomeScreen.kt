@@ -2,20 +2,16 @@ package org.example.project
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
@@ -35,10 +31,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import homeboxserverui.composeapp.generated.resources.Res
 import homeboxserverui.composeapp.generated.resources.search
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import org.example.project.searchData.CategoryOptions
 import org.example.project.searchData.FirstSearchResponse
 import org.example.project.searchData.SearchFilters
@@ -59,7 +52,7 @@ fun HomeScreen(username: String, onLogout: () -> Unit) {
     var sortOptions by remember { mutableStateOf<MutableList<SortOptions>>(mutableListOf()) }
     var searchItems by remember { mutableStateOf<List<SearchItem>>(mutableListOf()) }
 
-    suspend fun loadInitialData(){
+    suspend fun loadInitialData() {
         try {
             firstSearch = client.firstSearch()
             firstSearch?.searchFiltersData?.searchInOptionsList?.let {
@@ -86,17 +79,27 @@ fun HomeScreen(username: String, onLogout: () -> Unit) {
 
     var searchQuery by remember { mutableStateOf("") }
 
+    @OptIn(ExperimentalLayoutApi::class)
     Scaffold(
         modifier = Modifier.fillMaxSize(),
-        topBar = {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(MaterialTheme.colorScheme.surface)
-                    .padding(16.dp)
-            ) {
+    ) { innerPadding ->
+
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+
+            // Header (welcome + logout)
+            item {
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(MaterialTheme.colorScheme.surface)
+                        .padding(16.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -104,47 +107,38 @@ fun HomeScreen(username: String, onLogout: () -> Unit) {
                         text = "Welcome, $username!",
                         style = MaterialTheme.typography.headlineSmall
                     )
-                    Button(onClick = onLogout) {
-                        Text("Logout")
-                    }
+                    Button(onClick = onLogout) { Text("Logout") }
                 }
+            }
 
-                Spacer(Modifier.height(16.dp))
-
-                LazyVerticalGrid(
-                    columns = GridCells.Fixed(2),  // Defines a 2-column grid
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(8.dp),  // Ensures the grid takes full width and adds padding
-                    contentPadding = PaddingValues(8.dp) // Padding between items
+            // Filters (use FlowRow instead of a lazy grid)
+            item {
+                FlowRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    maxItemsInEachRow = 1,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    item {
-                        DropdownMenuView(
-                            SearchFilters.SearchInOptions.name, searchInOptions.map { it.text },
-                            onFilterSelected = { searchInOption ->
-                                //TODO....
-                            }
-                        )
-                    }
-                    item {
-                        DropdownMenuView(
-                            SearchFilters.CategoryOptions.name, categoryOptions.map { it.text },
-                            onFilterSelected = { categoryOptions ->
-                                //TODO....
-                            }
-                        )
-                    }
-                    item {
-                        DropdownMenuView(
-                            SearchFilters.SortOptions.name, sortOptions.map { it.text },
-                            onFilterSelected = { categoryOptions ->
-                                //TODO....
-                            }
-                        )
-                    }
+                    DropdownMenuView(
+                        SearchFilters.SearchInOptions.name,
+                        searchInOptions.map { it.text },
+                        onFilterSelected = { /* TODO */ }
+                    )
+                    DropdownMenuView(
+                        SearchFilters.CategoryOptions.name,
+                        categoryOptions.map { it.text },
+                        onFilterSelected = { /* TODO */ }
+                    )
+                    DropdownMenuView(
+                        SearchFilters.SortOptions.name,
+                        sortOptions.map { it.text },
+                        onFilterSelected = { /* TODO */ }
+                    )
                 }
+            }
 
-                // Search bar with simple button for search
+            // Search bar
+            item {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically
@@ -157,17 +151,15 @@ fun HomeScreen(username: String, onLogout: () -> Unit) {
                         singleLine = true,
                         shape = MaterialTheme.shapes.medium
                     )
-
-                    // Simple search button
                     Button(
                         onClick = {
                             println("Search query: $searchQuery")
                             scope.launch {
-                                //val result = client.search(searchQuery)
+                                // val result = client.search(searchQuery)
                                 // println("Search result: $result")
                             }
                         },
-                        modifier = Modifier.padding(start = 2.dp).size(70.dp)
+                        modifier = Modifier.padding(start = 8.dp).size(70.dp)
                     ) {
                         Icon(
                             painter = painterResource(Res.drawable.search),
@@ -177,21 +169,22 @@ fun HomeScreen(username: String, onLogout: () -> Unit) {
                     }
                 }
             }
-        }
-    ) { paddingValues ->
-         //Vertical grid of cards
-                LazyColumn(
+
+            // Results list
+            items(
+                items = searchItems,
+                key = { it.id } // if you have a stable id
+            ) { item ->
+                // Avoid huge horizontal padding—use something responsive
+                Box(
                     modifier = Modifier
-                        .fillMaxSize()
-                        .padding(paddingValues)
-                        .padding(horizontal = 300.dp),
-                    contentPadding = PaddingValues(vertical = 16.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally // Align cards horizontally in the center
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp)
                 ) {
-                  items(searchItems) { item ->
-                        ItemCardView(item)
-                    }
+                    ItemCardView(item)
                 }
+            }
+        }
     }
+
 }
