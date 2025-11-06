@@ -25,6 +25,7 @@ data class SearchFiltersData(
     val sortOptionsList: List<SortOptions>,
     val selectedCategory: CategoryOptions?,
     val selectedSearchIn: SearchInOptions?,
-    val selectedSort: SortOptions?
+    val selectedSort: SortOptions?,
+    val firstLastPage: Pair<Int, Int>
 )
 

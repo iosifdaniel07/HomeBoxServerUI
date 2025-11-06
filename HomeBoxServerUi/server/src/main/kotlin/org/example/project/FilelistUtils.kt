@@ -126,7 +126,17 @@ fun extractSelectOptions(document: Document): SearchFiltersData {
             sort.add(SortOptions(value.toInt(), text))
         }
     }
-    return SearchFiltersData(true, categories, searchIn, sort, selectedCategory, selectedSearchIn, selectedSort)
+    val pager = extractPageNumbers(document)
+    return SearchFiltersData(
+        true,
+        categories,
+        searchIn,
+        sort,
+        selectedCategory,
+        selectedSearchIn,
+        selectedSort,
+        pager
+    )
 }
 
 fun extractTorrentClasses(document: Document): List<SearchItem> {
@@ -176,6 +186,17 @@ fun extractTorrentClasses(document: Document): List<SearchItem> {
         }
     }
     return searchItemList
+}
+
+fun extractPageNumbers(document: Document): Pair<Int, Int> {
+    val firstPage =
+        document.select("div.pager > span > a").first()?.attr("href")?.substringAfter("page=")
+            ?.toIntOrNull() ?: 1
+
+    val lastPage =
+        document.select("div.pager > span > a").last()?.attr("href")?.substringAfter("page=")
+            ?.toIntOrNull() ?: 1
+    return Pair(firstPage, lastPage)
 }
 
 fun getIdFromDetailLink(link: String): String? {

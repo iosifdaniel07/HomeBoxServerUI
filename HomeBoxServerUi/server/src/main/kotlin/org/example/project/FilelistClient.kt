@@ -127,7 +127,18 @@ class FilelistClient {
         } catch (e: Exception) {
 
         }
-        return FirstSearchResponse(SearchFiltersData(false, listOf(), listOf(), listOf(), null, null, null), listOf())
+        return FirstSearchResponse(
+            SearchFiltersData(
+                false,
+                listOf(),
+                listOf(),
+                listOf(),
+                null,
+                null,
+                null,
+                Pair(1, 1)
+            ), listOf()
+        )
     }
 
     /**
