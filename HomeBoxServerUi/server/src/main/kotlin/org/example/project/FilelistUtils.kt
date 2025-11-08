@@ -197,7 +197,7 @@ fun extractPageNumbers(document: Document): Pair<Int, Int> {
 
     val lastPage =
         document.select("div.pager > span > a").last()?.attr("href")?.substringAfter("page=")
-            ?.toIntOrNull() ?: 1
+            ?.toIntOrNull() ?: 0
     return Pair(firstPage, lastPage + 1)
 }
 
