@@ -10,6 +10,7 @@ import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.plugins.contentnegotiation.*
 import io.ktor.server.plugins.cors.routing.CORS
 import io.ktor.server.request.receive
+import org.example.project.searchData.SearchCompleteItem
 
 fun main() {
     embeddedServer(Netty, port = SERVER_PORT, host = "0.0.0.0", module = Application::module)
@@ -44,24 +45,17 @@ fun Application.module() {
             call.respond(HttpStatusCode.OK, LoginResponse(success))
         }
 
-        /* post("/search") {
-             val query = call.receive<SearchRequest>().query//todo...
-             val results = client.firstSearch()
-             println("search here : ${query}")
-             call.respond(HttpStatusCode.OK, SearchResponse(results))
-         }*/
-
         get("/firstSearch") {
             println("first search")
             val results = client.firstSearch()
             call.respond(HttpStatusCode.OK, results)
         }
 
-        post("/searchPage") {
-            println("search page")
-            val page = call.receive<Int>()
-            println(page)
-            val results = client.searchPage(page)
+        post("/search") {
+            println("search")
+            val searchItem = call.receive<SearchCompleteItem>()
+            println(searchItem)
+            val results = client.search(searchItem)
             call.respond(HttpStatusCode.OK, results)
         }
     }

@@ -3,7 +3,6 @@ package org.example.project
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
@@ -15,9 +14,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -37,22 +34,18 @@ import homeboxserverui.composeapp.generated.resources.Res
 import homeboxserverui.composeapp.generated.resources.search
 import kotlinx.coroutines.launch
 import org.example.project.searchData.CategoryOptions
-import org.example.project.searchData.FirstSearchResponse
+import org.example.project.searchData.SearchCompleteItem
 import org.example.project.searchData.SearchFilters
 import org.example.project.searchData.SearchInOptions
 import org.example.project.searchData.SearchItem
 import org.example.project.searchData.SortOptions
 import org.jetbrains.compose.resources.painterResource
-import kotlin.math.max
-import kotlin.math.min
 
 @Composable
 fun HomeScreen(username: String, onLogout: () -> Unit) {
-    // Sample data for demonstration
     val client = Client
-    val scope = rememberCoroutineScope()                        // ← prefer this over MainScope()
+    val scope = rememberCoroutineScope()
 
-    var firstSearch by remember { mutableStateOf<FirstSearchResponse?>(null) }
     var searchInOptions by remember { mutableStateOf<MutableList<SearchInOptions>>(mutableListOf()) }
     var categoryOptions by remember { mutableStateOf<MutableList<CategoryOptions>>(mutableListOf()) }
     var sortOptions by remember { mutableStateOf<MutableList<SortOptions>>(mutableListOf()) }
@@ -62,26 +55,33 @@ fun HomeScreen(username: String, onLogout: () -> Unit) {
     var selectedSort by remember { mutableStateOf<SortOptions?>(null) }
     var selectedPage by remember { mutableStateOf(1) }
     var pagesPair by remember { mutableStateOf(Pair(1, 1)) }
+    var currentSearchItem by remember { mutableStateOf(CurrentSearchItem("", 0, 0, 0)) }
 
     suspend fun loadInitialData() {
         try {
-            firstSearch = client.firstSearch()
-            firstSearch?.searchFiltersData?.let {
+            val firstSearch = client.firstSearch()
+            firstSearch.searchFiltersData.let {
                 searchInOptions = it.searchInOptionsList.toMutableList()
                 selectedSearchIn = it.selectedSearchIn ?: searchInOptions.firstOrNull()
                 pagesPair = it.firstLastPage
             }
-            firstSearch?.searchFiltersData?.let {
+            firstSearch.searchFiltersData.let {
                 categoryOptions = it.categoryOptionsList.toMutableList()
                 selectedCategory = it.selectedCategory ?: categoryOptions.firstOrNull()
             }
-            firstSearch?.searchFiltersData?.let {
+            firstSearch.searchFiltersData.let {
                 sortOptions = it.sortOptionsList.toMutableList()
                 selectedSort = it.selectedSort ?: sortOptions.firstOrNull()
             }
-            firstSearch?.searchItems?.let {
+            firstSearch.searchItems.let {
                 searchItems = it.toMutableList()
             }
+            currentSearchItem = CurrentSearchItem(
+                "",
+                selectedCategory?.value ?: 0,
+                selectedSearchIn?.value ?: 0,
+                selectedSort?.value ?: 0
+            )
         } catch (e: Exception) {
 
         }
@@ -139,9 +139,9 @@ fun HomeScreen(username: String, onLogout: () -> Unit) {
                             SearchFilters.CategoryOptions.name,
                             categoryOptions.map { it.text },
                             selectedCategory?.text,
-                            onFilterSelected = {
+                            onFilterSelected = { newSelected ->
                                 selectedCategory =
-                                    categoryOptions.find { it.text == selectedCategory?.text }
+                                    categoryOptions.find { it.text == newSelected }
                             }
                         )
                     }
@@ -150,9 +150,9 @@ fun HomeScreen(username: String, onLogout: () -> Unit) {
                             SearchFilters.SearchInOptions.name,
                             searchInOptions.map { it.text },
                             selectedSearchIn?.text,
-                            onFilterSelected = {
+                            onFilterSelected = { newSelected ->
                                 selectedSearchIn =
-                                    searchInOptions.find { it.text == selectedSearchIn?.text }
+                                    searchInOptions.find { it.text == newSelected }
                             }
                         )
                     }
@@ -161,8 +161,8 @@ fun HomeScreen(username: String, onLogout: () -> Unit) {
                             SearchFilters.SortOptions.name,
                             sortOptions.map { it.text },
                             selectedSort?.text,
-                            onFilterSelected = {
-                                selectedSort = sortOptions.find { it.text == selectedSort?.text }
+                            onFilterSelected = { newSelected ->
+                                selectedSort = sortOptions.find { it.text == newSelected }
                             }
                         )
                     }
@@ -187,8 +187,27 @@ fun HomeScreen(username: String, onLogout: () -> Unit) {
                         onClick = {
                             println("Search query: $searchQuery")
                             scope.launch {
-                                // val result = client.search(searchQuery)
-                                // println("Search result: $result")
+                                scope.launch {
+                                    client.search(
+                                        SearchCompleteItem(
+                                            pageNumber = null,
+                                            selectedSort = selectedSort?.value,
+                                            selectedSearchIn = selectedSearchIn?.value,
+                                            selectedCategory = selectedCategory?.value,
+                                            searchTerm = searchQuery
+                                        )
+                                    ).also {
+                                        searchItems = it.searchItems
+                                        pagesPair = it.firstLastPage
+                                        selectedPage = 1
+                                    }
+                                    currentSearchItem = CurrentSearchItem(
+                                        searchQuery,
+                                        selectedCategory?.value ?: 0,
+                                        selectedSearchIn?.value ?: 0,
+                                        selectedSort?.value ?: 0
+                                    )
+                                }
                             }
                         },
                         modifier = Modifier.padding(start = 8.dp).size(70.dp)
@@ -210,7 +229,15 @@ fun HomeScreen(username: String, onLogout: () -> Unit) {
                         onPageChange = { newPage ->
                             selectedPage = newPage
                             scope.launch {
-                                searchItems = client.searchPage(newPage - 1)
+                                searchItems = client.search(
+                                    SearchCompleteItem(
+                                        pageNumber = newPage - 1,
+                                        selectedSort = currentSearchItem.sort,
+                                        selectedSearchIn = currentSearchItem.searchIn,
+                                        selectedCategory = currentSearchItem.category,
+                                        searchTerm = currentSearchItem.term
+                                    )
+                                ).searchItems
                             }
                         }
                     )
@@ -240,7 +267,15 @@ fun HomeScreen(username: String, onLogout: () -> Unit) {
                         onPageChange = { newPage ->
                             selectedPage = newPage
                             scope.launch {
-                                searchItems = client.searchPage(newPage - 1)
+                                searchItems = client.search(
+                                    SearchCompleteItem(
+                                        pageNumber = newPage - 1,
+                                        selectedSort = currentSearchItem.sort,
+                                        selectedSearchIn = currentSearchItem.searchIn,
+                                        selectedCategory = currentSearchItem.category,
+                                        searchTerm = currentSearchItem.term
+                                    )
+                                ).searchItems
                             }
                         }
                     )

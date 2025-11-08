@@ -9,7 +9,9 @@ data class SearchRequest(
 
 @Serializable
 data class SearchResponse(
-    val searchFiltersData: SearchFiltersData
+    val isSuccessful: Boolean,
+    val searchItems: List<SearchItem>,
+    val firstLastPage: Pair<Int, Int>
 )
 
 @Serializable

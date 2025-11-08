@@ -6,8 +6,10 @@ import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import org.example.project.searchData.FirstSearchResponse
+import org.example.project.searchData.SearchCompleteItem
 import org.example.project.searchData.SearchFiltersData
 import org.example.project.searchData.SearchItem
+import org.example.project.searchData.SearchResponse
 import org.jsoup.Jsoup
 
 /**
@@ -146,18 +148,69 @@ class FilelistClient {
         )
     }
 
-    suspend fun searchPage(page: Int): List<SearchItem> {
+    suspend fun search(searchItem: SearchCompleteItem): SearchResponse {
         try {
-            val response = client.get("https://filelist.io/browse.php?page=$page") {
+            val response = client.get(createSearchUrl(searchItem)) {
                 searchHeaders()
             }
             println("status" + response.status)
             println("headers:..." + response.headers)
             val document = Jsoup.parse(response.bodyAsText())
             val searchItems = extractTorrentClasses(document)
-            return searchItems
+            val pager = extractPageNumbers(document)
+            println("pager: $pager")
+            return SearchResponse(true, searchItems, pager)
         } catch (e: Exception) {
-            return emptyList()
+            return SearchResponse(false, listOf(), Pair(1, 1))
+        }
+    }
+
+    private fun createSearchUrl(searchItem: SearchCompleteItem): String {
+        val baseUrl = "https://filelist.io/browse.php"
+        if (searchItem.selectedSearchIn != null || searchItem.selectedCategory != null || searchItem.selectedSort != null || searchItem.searchTerm != null || searchItem.pageNumber != null) {
+            val urlBuilder = StringBuilder(baseUrl)
+            urlBuilder.append("?")
+            var previousParamAdded = false
+
+            searchItem.searchTerm?.let {
+                val searchTermEdited = it.replace(" ", "+")
+                urlBuilder.append("search=$searchTermEdited")
+                previousParamAdded = true
+            }
+
+            searchItem.selectedCategory?.let {
+                if (previousParamAdded) {
+                    urlBuilder.append("&")
+                }
+                urlBuilder.append("cat=${it}")
+                previousParamAdded = true
+            }
+
+            searchItem.selectedSearchIn?.let {
+                if (previousParamAdded) {
+                    urlBuilder.append("&")
+                }
+                urlBuilder.append("searchin=${it}")
+                previousParamAdded = true
+            }
+
+            searchItem.selectedSort?.let {
+                if (previousParamAdded) {
+                    urlBuilder.append("&")
+                }
+                urlBuilder.append("sort=${it}")
+                previousParamAdded = true
+            }
+            searchItem.pageNumber?.let {
+                if (previousParamAdded) {
+                    urlBuilder.append("&")
+                }
+                urlBuilder.append("page=$it")
+            }
+
+            return urlBuilder.toString()
+        } else {
+            return baseUrl
         }
     }
 

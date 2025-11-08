@@ -127,6 +127,7 @@ fun extractSelectOptions(document: Document): SearchFiltersData {
         }
     }
     val pager = extractPageNumbers(document)
+    println("pager: $pager")
     return SearchFiltersData(
         true,
         categories,
