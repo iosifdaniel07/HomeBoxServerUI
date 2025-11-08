@@ -7,6 +7,7 @@ import io.ktor.client.statement.*
 import io.ktor.http.*
 import org.example.project.searchData.FirstSearchResponse
 import org.example.project.searchData.SearchFiltersData
+import org.example.project.searchData.SearchItem
 import org.jsoup.Jsoup
 
 /**
@@ -24,6 +25,37 @@ class FilelistClient {
     }
     var cachedValidator: String? = null
     var cookiesHeader: String? = null
+
+    val searchHeaders: HttpRequestBuilder.() -> Unit = {
+        header(
+            HttpHeaders.Accept,
+            "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8"
+        )
+        header(HttpHeaders.AcceptLanguage, "en-US,en;q=0.9")
+        header("Referer", "https://filelist.io/index.php")
+        header("priority", "u=0, i")
+        header(
+            "sec-ch-ua",
+            "\"Brave\";v=\"141\", \"Not?A_Brand\";v=\"8\", \"Chromium\";v=\"141\""
+        )
+        header("sec-ch-ua-mobile", "?0")
+        header("sec-ch-ua-platform", "\"Linux\"")
+        header("sec-fetch-dest", "document")
+        header("sec-fetch-mode", "navigate")
+        header("sec-fetch-site", "same-origin")
+        header("sec-fetch-user", "?1")
+        header("sec-gpc", "1")
+        header("upgrade-insecure-requests", "1")
+        header(
+            HttpHeaders.UserAgent,
+            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36"
+        )
+        //header("Cookie", cookiesHeader)
+        header(
+            "Cookie",
+            "PHPSESSID=apmbbir6uuvbhpol2lpiliteu8; uid=1411920; pass=d8db42735ab25cb809ab5b9ef6b07b11"
+        )
+    }
 
     /**
      * Login to filelist.io
@@ -90,34 +122,7 @@ class FilelistClient {
     suspend fun firstSearch(): FirstSearchResponse {
         try {
             val response = client.get("https://filelist.io/browse.php") {
-                header(
-                    HttpHeaders.Accept,
-                    "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8"
-                )
-                header(HttpHeaders.AcceptLanguage, "en-US,en;q=0.9")
-                header("Referer", "https://filelist.io/index.php")
-                header("priority", "u=0, i")
-                header(
-                    "sec-ch-ua",
-                    "\"Brave\";v=\"141\", \"Not?A_Brand\";v=\"8\", \"Chromium\";v=\"141\""
-                )
-                header("sec-ch-ua-mobile", "?0")
-                header("sec-ch-ua-platform", "\"Linux\"")
-                header("sec-fetch-dest", "document")
-                header("sec-fetch-mode", "navigate")
-                header("sec-fetch-site", "same-origin")
-                header("sec-fetch-user", "?1")
-                header("sec-gpc", "1")
-                header("upgrade-insecure-requests", "1")
-                header(
-                    HttpHeaders.UserAgent,
-                    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36"
-                )
-                //header("Cookie", cookiesHeader)
-                header(
-                    "Cookie",
-                    "PHPSESSID=apmbbir6uuvbhpol2lpiliteu8; uid=1411920; pass=d8db42735ab25cb809ab5b9ef6b07b11"
-                )
+                searchHeaders()
             }
             println("status" + response.status)
             println("headers:..." + response.headers)
@@ -139,6 +144,21 @@ class FilelistClient {
                 Pair(1, 1)
             ), listOf()
         )
+    }
+
+    suspend fun searchPage(page: Int): List<SearchItem> {
+        try {
+            val response = client.get("https://filelist.io/browse.php?page=$page") {
+                searchHeaders()
+            }
+            println("status" + response.status)
+            println("headers:..." + response.headers)
+            val document = Jsoup.parse(response.bodyAsText())
+            val searchItems = extractTorrentClasses(document)
+            return searchItems
+        } catch (e: Exception) {
+            return emptyList()
+        }
     }
 
     /**

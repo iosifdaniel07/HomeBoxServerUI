@@ -60,7 +60,7 @@ fun HomeScreen(username: String, onLogout: () -> Unit) {
     var selectedCategory by remember { mutableStateOf<CategoryOptions?>(null) }
     var selectedSearchIn by remember { mutableStateOf<SearchInOptions?>(null) }
     var selectedSort by remember { mutableStateOf<SortOptions?>(null) }
-    var selectedPage = 1
+    var selectedPage by remember { mutableStateOf(1) }
     var pagesPair by remember { mutableStateOf(Pair(1, 1)) }
 
     suspend fun loadInitialData() {
@@ -203,12 +203,15 @@ fun HomeScreen(username: String, onLogout: () -> Unit) {
             }
 
             item {
-                key(pagesPair) {
+                key(pagesPair, selectedPage) {
                     Pager(
                         totalPages = pagesPair.second,
                         initialPage = selectedPage,
                         onPageChange = { newPage ->
-
+                            selectedPage = newPage
+                            scope.launch {
+                                searchItems = client.searchPage(newPage - 1)
+                            }
                         }
                     )
                 }
@@ -230,12 +233,15 @@ fun HomeScreen(username: String, onLogout: () -> Unit) {
             }
 
             item {
-                key(pagesPair) {
+                key(pagesPair, selectedPage) {
                     Pager(
                         totalPages = pagesPair.second,
                         initialPage = selectedPage,
                         onPageChange = { newPage ->
-
+                            selectedPage = newPage
+                            scope.launch {
+                                searchItems = client.searchPage(newPage - 1)
+                            }
                         }
                     )
                 }

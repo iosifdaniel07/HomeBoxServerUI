@@ -8,13 +8,14 @@ import io.ktor.http.ContentType
 import io.ktor.http.contentType
 import io.ktor.serialization.kotlinx.json.*
 import org.example.project.searchData.FirstSearchResponse
+import org.example.project.searchData.SearchItem
 import org.example.project.searchData.SearchRequest
 import org.example.project.searchData.SearchResponse
 
 
 // Shared class to handle API calls in common code
 object Client {
-    val client = HttpClient{//(CIO) {
+    val client = HttpClient {//(CIO) {
         install(ContentNegotiation) {
             json()
         }
@@ -29,7 +30,7 @@ object Client {
     }
 
     suspend fun search(query: String): SearchResponse {
-        val response: SearchResponse =  client.post("http://192.168.1.139:8085/search") {
+        val response: SearchResponse = client.post("http://192.168.1.139:8085/search") {
             contentType(ContentType.Application.Json)
             setBody(SearchRequest(query))
         }.body()
@@ -37,7 +38,16 @@ object Client {
     }
 
     suspend fun firstSearch(): FirstSearchResponse {
-        val response: FirstSearchResponse =  client.get("http://192.168.1.139:8085/firstSearch").body()
+        val response: FirstSearchResponse =
+            client.get("http://192.168.1.139:8085/firstSearch").body()
+        return response
+    }
+
+    suspend fun searchPage(page: Int): List<SearchItem> {
+        val response: List<SearchItem> = client.post("http://192.168.1.139:8085/searchPage") {
+            contentType(ContentType.Application.Json)
+            setBody(page)
+        }.body()
         return response
     }
 
