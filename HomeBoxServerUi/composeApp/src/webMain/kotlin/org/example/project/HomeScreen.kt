@@ -56,6 +56,8 @@ fun HomeScreen(username: String, onLogout: () -> Unit) {
     var selectedPage by remember { mutableStateOf(1) }
     var pagesPair by remember { mutableStateOf(Pair(1, 1)) }
     var currentSearchItem by remember { mutableStateOf(CurrentSearchItem("", 0, 0, 0)) }
+    var isInitialLoad by remember { mutableStateOf(true) }
+
 
     suspend fun loadInitialData() {
         try {
@@ -187,27 +189,26 @@ fun HomeScreen(username: String, onLogout: () -> Unit) {
                         onClick = {
                             println("Search query: $searchQuery")
                             scope.launch {
-                                scope.launch {
-                                    client.search(
-                                        SearchCompleteItem(
-                                            pageNumber = null,
-                                            selectedSort = selectedSort?.value,
-                                            selectedSearchIn = selectedSearchIn?.value,
-                                            selectedCategory = selectedCategory?.value,
-                                            searchTerm = searchQuery
-                                        )
-                                    ).also {
-                                        searchItems = it.searchItems
-                                        pagesPair = it.firstLastPage
-                                        selectedPage = 1
-                                    }
-                                    currentSearchItem = CurrentSearchItem(
-                                        searchQuery,
-                                        selectedCategory?.value ?: 0,
-                                        selectedSearchIn?.value ?: 0,
-                                        selectedSort?.value ?: 0
+                                client.search(
+                                    SearchCompleteItem(
+                                        pageNumber = null,
+                                        selectedSort = selectedSort?.value,
+                                        selectedSearchIn = selectedSearchIn?.value,
+                                        selectedCategory = selectedCategory?.value,
+                                        searchTerm = searchQuery
                                     )
+                                ).also {
+                                    searchItems = it.searchItems
+                                    pagesPair = it.firstLastPage
+                                    selectedPage = 1
                                 }
+                                isInitialLoad = false
+                                currentSearchItem = CurrentSearchItem(
+                                    searchQuery,
+                                    selectedCategory?.value ?: 0,
+                                    selectedSearchIn?.value ?: 0,
+                                    selectedSort?.value ?: 0
+                                )
                             }
                         },
                         modifier = Modifier.padding(start = 8.dp).size(70.dp)
@@ -229,15 +230,27 @@ fun HomeScreen(username: String, onLogout: () -> Unit) {
                         onPageChange = { newPage ->
                             selectedPage = newPage
                             scope.launch {
-                                searchItems = client.search(
-                                    SearchCompleteItem(
-                                        pageNumber = newPage - 1,
-                                        selectedSort = currentSearchItem.sort,
-                                        selectedSearchIn = currentSearchItem.searchIn,
-                                        selectedCategory = currentSearchItem.category,
-                                        searchTerm = currentSearchItem.term
-                                    )
-                                ).searchItems
+                                if (isInitialLoad) {
+                                    searchItems = client.search(
+                                        SearchCompleteItem(
+                                            pageNumber = newPage - 1,
+                                            selectedSort = null,
+                                            selectedSearchIn = null,
+                                            selectedCategory = null,
+                                            searchTerm = null
+                                        )
+                                    ).searchItems
+                                } else {
+                                    searchItems = client.search(
+                                        SearchCompleteItem(
+                                            pageNumber = newPage - 1,
+                                            selectedSort = currentSearchItem.sort,
+                                            selectedSearchIn = currentSearchItem.searchIn,
+                                            selectedCategory = currentSearchItem.category,
+                                            searchTerm = currentSearchItem.term
+                                        )
+                                    ).searchItems
+                                }
                             }
                         }
                     )
@@ -267,15 +280,27 @@ fun HomeScreen(username: String, onLogout: () -> Unit) {
                         onPageChange = { newPage ->
                             selectedPage = newPage
                             scope.launch {
-                                searchItems = client.search(
-                                    SearchCompleteItem(
-                                        pageNumber = newPage - 1,
-                                        selectedSort = currentSearchItem.sort,
-                                        selectedSearchIn = currentSearchItem.searchIn,
-                                        selectedCategory = currentSearchItem.category,
-                                        searchTerm = currentSearchItem.term
-                                    )
-                                ).searchItems
+                                if (isInitialLoad) {
+                                    searchItems = client.search(
+                                        SearchCompleteItem(
+                                            pageNumber = newPage - 1,
+                                            selectedSort = null,
+                                            selectedSearchIn = null,
+                                            selectedCategory = null,
+                                            searchTerm = null
+                                        )
+                                    ).searchItems
+                                } else {
+                                    searchItems = client.search(
+                                        SearchCompleteItem(
+                                            pageNumber = newPage - 1,
+                                            selectedSort = currentSearchItem.sort,
+                                            selectedSearchIn = currentSearchItem.searchIn,
+                                            selectedCategory = currentSearchItem.category,
+                                            searchTerm = currentSearchItem.term
+                                        )
+                                    ).searchItems
+                                }
                             }
                         }
                     )
