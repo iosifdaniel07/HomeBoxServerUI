@@ -5,9 +5,10 @@ import java.nio.file.FileSystems
 import java.text.DecimalFormat
 import kotlin.math.roundToInt
 
-fun getAllDiskUsage(): List<FilesystemUsage> {
+fun getAllDiskUsage(): FilesystemUsage {
     val df = DecimalFormat("#.##")
-    val list = mutableListOf<FilesystemUsage>()
+    var disk : FilesystemUsage? = null
+    var maxSize = -1L
 
     for (store in FileSystems.getDefault().fileStores) {
         val total = runCatching { store.totalSpace }.getOrDefault(0L)
@@ -16,16 +17,19 @@ fun getAllDiskUsage(): List<FilesystemUsage> {
         val used = (total - unallocated).coerceAtLeast(0L)
         val percentUsed = if (total > 0) ((used.toDouble() / total) * 100).roundToInt() else 0
 
-        list += FilesystemUsage(
-            filesystem = store.name().ifBlank { "unknown" },
-            mount = store.toString(),
-            total = humanSize(total, df),
-            used = humanSize(used, df),
-            avail = humanSize(usable, df),
-            usePercent = percentUsed
-        )
+        if(total > maxSize){
+            disk = FilesystemUsage(
+                filesystem = store.name().ifBlank { "unknown" },
+                mount = store.toString(),
+                total = humanSize(total, df),
+                used = humanSize(used, df),
+                avail = humanSize(usable, df),
+                usePercent = percentUsed
+            )
+            maxSize = total
+        }
     }
-    return list.sortedBy { it.mount }
+    return disk ?: FilesystemUsage("", "", "", "", "", 0)
 }
 
 private fun humanSize(bytes: Long, df: DecimalFormat): String {

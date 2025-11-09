@@ -48,7 +48,7 @@ fun DiskSpaceScreen() {
 
     fun refresh() = scope.launch {
         loading = true; error = null
-        try { data = client.diskSize() } catch (t: Throwable) { error = t.message ?: t.toString() }
+        try { data = listOf(client.diskSize()) } catch (t: Throwable) { error = t.message ?: t.toString() }
         finally { loading = false }
     }
 

@@ -43,8 +43,8 @@ object Client {
         return response
     }
 
-    suspend fun diskSize(): List<FilesystemUsage> {
-        val response: List<FilesystemUsage> = client.get("http://192.168.1.139:8085/diskSpace") {
+    suspend fun diskSize(): FilesystemUsage {
+        val response: FilesystemUsage = client.get("http://192.168.1.139:8085/diskSpace") {
         }.body()
         return response
     }
