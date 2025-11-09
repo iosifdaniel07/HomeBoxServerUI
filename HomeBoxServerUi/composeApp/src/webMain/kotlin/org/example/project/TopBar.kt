@@ -1,6 +1,9 @@
 package org.example.project
 
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -42,34 +45,39 @@ fun TopBar(currentScreen: Screen, onMenuSelected: (screen: Screen) -> Unit) {
         allActions.filter { it.screen != currentScreen }
     }
 
-    Button(
-        onClick = { showSheet = true },
-        colors = ButtonDefaults.buttonColors(
-            containerColor = Color.Transparent,
-            contentColor = LocalContentColor.current,
-            disabledContainerColor = Color.Transparent,
-            disabledContentColor = LocalContentColor.current.copy(alpha = 0.38f)
-        ),
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.End
     ) {
-        Image(
-            painter = painterResource(Res.drawable.menus),
-            contentDescription = null,
-            modifier = Modifier.size(60.dp),
-            colorFilter = ColorFilter.tint(
-                color = MaterialTheme.colorScheme.primary,   // pick your color
-                blendMode = BlendMode.SrcIn                  // standard for icon tinting
+        Button(
+            onClick = { showSheet = true },
+            colors = ButtonDefaults.buttonColors(
+                containerColor = Color.Transparent,
+                contentColor = LocalContentColor.current,
+                disabledContainerColor = Color.Transparent,
+                disabledContentColor = LocalContentColor.current.copy(alpha = 0.38f)
+            ),
+        ) {
+            Image(
+                painter = painterResource(Res.drawable.menus),
+                contentDescription = null,
+                modifier = Modifier.size(60.dp),
+                colorFilter = ColorFilter.tint(
+                    color = MaterialTheme.colorScheme.primary,   // pick your color
+                    blendMode = BlendMode.SrcIn                  // standard for icon tinting
+                )
             )
-        )
-    }
-    key(showSheet) {
-        ActionSheet(
-            visible = showSheet,
-            title = "Actions",
-            items = visibleActions,
-            onDismiss = { showSheet = false },
-            onClick = { item ->
-                item.onClick.invoke()
-            }
-        )
+        }
+        key(showSheet) {
+            ActionSheet(
+                visible = showSheet,
+                title = "Actions",
+                items = visibleActions,
+                onDismiss = { showSheet = false },
+                onClick = { item ->
+                    item.onClick.invoke()
+                }
+            )
+        }
     }
 }

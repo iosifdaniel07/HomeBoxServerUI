@@ -24,7 +24,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import org.example.project.serverData.FilesystemUsage
-import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Surface
@@ -40,7 +39,7 @@ import androidx.compose.ui.text.style.TextOverflow
 @Composable
 fun DiskSpaceScreen(onMenuSelected: (screen: Screen) -> Unit) {
 
-    var data by remember { mutableStateOf<List<FilesystemUsage>>(emptyList()) }
+    var data by remember { mutableStateOf<FilesystemUsage?>(null) }
     var loading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
     val client = Client
@@ -49,7 +48,7 @@ fun DiskSpaceScreen(onMenuSelected: (screen: Screen) -> Unit) {
     fun refresh() = scope.launch {
         loading = true; error = null
         try {
-            data = listOf(client.diskSize())
+            data = client.diskSize()
         } catch (t: Throwable) {
             error = t.message ?: t.toString()
         } finally {
@@ -59,47 +58,39 @@ fun DiskSpaceScreen(onMenuSelected: (screen: Screen) -> Unit) {
 
     LaunchedEffect(Unit) { refresh() }
 
-    MaterialTheme {
-        Scaffold(
+    Scaffold(
 
-        ) { padding ->
-            Box(
-                Modifier
-                    .padding(padding)
-                    .fillMaxSize()
-                    .padding(16.dp)
-            ) {
-                when {
-                    loading && data.isEmpty() -> CircularProgressIndicator(Modifier.align(Alignment.Center))
-                    error != null -> ErrorBanner(message = error!!, onRetry = { refresh() })
-                    else -> LazyColumn(
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
-                        modifier = Modifier.fillMaxSize()
-                    ) {
-                        items(data, key = { it.filesystem + "@" + it.mount }) { fs ->
-                            FilesystemCard(fs)
+    ) { padding ->
+        LazyColumn(
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.fillMaxSize()
+        ) {
+            item {
+                TopBar(Screen.DISK_SPACE, onMenuSelected)
+            }
+            item {
+                Box(
+                    Modifier
+                        .padding(padding)
+                        .fillMaxSize()
+                        .padding(16.dp)
+                ) {
+                    when {
+                        loading && data == null -> CircularProgressIndicator(
+                            Modifier.align(
+                                Alignment.Center
+                            )
+                        )
+
+                        error != null -> ErrorBanner(message = error!!, onRetry = { refresh() })
+                        else -> {
+                            data?.let {
+                                FilesystemCard(it)
+                            }
                         }
-                        item { Spacer(Modifier.height(8.dp)) }
                     }
                 }
             }
-        }
-    }
-}
-
-@Composable
-fun DiskSpaceList(items: List<FilesystemUsage>, modifier: Modifier = Modifier) {
-    MaterialTheme {
-        LazyColumn(
-            modifier = modifier
-                .fillMaxSize()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            items(items, key = { it.filesystem + "@" + it.mount }) { fs ->
-                FilesystemCard(fs)
-            }
-            item { Spacer(Modifier.height(8.dp)) }
         }
     }
 }
