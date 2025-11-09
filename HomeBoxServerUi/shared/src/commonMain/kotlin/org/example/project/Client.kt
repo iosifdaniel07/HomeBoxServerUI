@@ -9,8 +9,8 @@ import io.ktor.http.contentType
 import io.ktor.serialization.kotlinx.json.*
 import org.example.project.searchData.FirstSearchResponse
 import org.example.project.searchData.SearchCompleteItem
-import org.example.project.searchData.SearchItem
 import org.example.project.searchData.SearchResponse
+import org.example.project.serverData.FilesystemUsage
 
 
 // Shared class to handle API calls in common code
@@ -39,6 +39,12 @@ object Client {
         val response: SearchResponse = client.post("http://192.168.1.139:8085/search") {
             contentType(ContentType.Application.Json)
             setBody(item)
+        }.body()
+        return response
+    }
+
+    suspend fun diskSize(): List<FilesystemUsage> {
+        val response: List<FilesystemUsage> = client.get("http://192.168.1.139:8085/diskSpace") {
         }.body()
         return response
     }

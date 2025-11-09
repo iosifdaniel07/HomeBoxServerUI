@@ -42,7 +42,7 @@ import org.example.project.searchData.SortOptions
 import org.jetbrains.compose.resources.painterResource
 
 @Composable
-fun HomeScreen(username: String, onLogout: () -> Unit) {
+fun HomeScreen(username: String, onMenuSelected: (screen: Screen) -> Unit) {
     val client = Client
     val scope = rememberCoroutineScope()
 
@@ -124,7 +124,8 @@ fun HomeScreen(username: String, onLogout: () -> Unit) {
                         text = "Welcome, $username!",
                         style = MaterialTheme.typography.headlineSmall
                     )
-                    Button(onClick = onLogout) { Text("Logout") }
+                    Button(onClick = { onMenuSelected(Screen.DISK_SPACE) }) { Text("Device space") }
+                    Button(onClick = { onMenuSelected(Screen.LOGIN) }) { Text("Logout") }
                 }
             }
 

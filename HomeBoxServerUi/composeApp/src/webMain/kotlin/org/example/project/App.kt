@@ -5,7 +5,8 @@ import androidx.compose.runtime.*
 
 enum class Screen {
     LOGIN,
-    HOME
+    HOME,
+    DISK_SPACE
 }
 
 @Composable
@@ -26,10 +27,16 @@ fun App() {
             }
 
             Screen.HOME -> {
-                HomeScreen(username = loggedInUser) {
-                    currentScreen = Screen.LOGIN
-                    loggedInUser = ""
+                HomeScreen(username = loggedInUser) { screen ->
+                    currentScreen = screen
+                    if (screen == Screen.LOGIN) {
+                        loggedInUser = ""
+                    }
                 }
+            }
+
+            Screen.DISK_SPACE -> {
+                DiskSpaceScreen()
             }
         }
     }

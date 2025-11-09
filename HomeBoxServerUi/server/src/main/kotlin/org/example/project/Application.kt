@@ -10,6 +10,8 @@ import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.plugins.contentnegotiation.*
 import io.ktor.server.plugins.cors.routing.CORS
 import io.ktor.server.request.receive
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.example.project.searchData.SearchCompleteItem
 
 fun main() {
@@ -57,6 +59,11 @@ fun Application.module() {
             println(searchItem)
             val results = client.search(searchItem)
             call.respond(HttpStatusCode.OK, results)
+        }
+
+        get("/diskSpace") {
+            val usage = withContext(Dispatchers.IO) { getAllDiskUsage() }
+            call.respond(usage)
         }
     }
 }
