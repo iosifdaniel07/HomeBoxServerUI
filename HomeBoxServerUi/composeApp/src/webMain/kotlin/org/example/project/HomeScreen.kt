@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -14,6 +15,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
+import androidx.compose.material3.DividerDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -116,7 +119,7 @@ fun HomeScreen(username: String, onMenuSelected: (screen: Screen) -> Unit) {
                     modifier = Modifier
                         .fillMaxWidth()
                         .background(MaterialTheme.colorScheme.surface)
-                        .padding(16.dp),
+                        .padding(2.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -124,9 +127,13 @@ fun HomeScreen(username: String, onMenuSelected: (screen: Screen) -> Unit) {
                         text = "Welcome, $username!",
                         style = MaterialTheme.typography.headlineSmall
                     )
-                    Button(onClick = { onMenuSelected(Screen.DISK_SPACE) }) { Text("Device space") }
-                    Button(onClick = { onMenuSelected(Screen.LOGIN) }) { Text("Logout") }
+                    TopBar(Screen.HOME, onMenuSelected)
                 }
+                HorizontalDivider(
+                    Modifier.padding(vertical = 0.dp),
+                    DividerDefaults.Thickness,
+                    DividerDefaults.color
+                )
             }
 
             // Filters (use FlowRow instead of a lazy grid)

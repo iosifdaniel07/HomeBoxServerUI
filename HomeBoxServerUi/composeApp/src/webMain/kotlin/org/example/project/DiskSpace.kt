@@ -38,7 +38,7 @@ import androidx.compose.ui.text.style.TextOverflow
 
 
 @Composable
-fun DiskSpaceScreen() {
+fun DiskSpaceScreen(onMenuSelected: (screen: Screen) -> Unit) {
 
     var data by remember { mutableStateOf<List<FilesystemUsage>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
@@ -48,8 +48,13 @@ fun DiskSpaceScreen() {
 
     fun refresh() = scope.launch {
         loading = true; error = null
-        try { data = listOf(client.diskSize()) } catch (t: Throwable) { error = t.message ?: t.toString() }
-        finally { loading = false }
+        try {
+            data = listOf(client.diskSize())
+        } catch (t: Throwable) {
+            error = t.message ?: t.toString()
+        } finally {
+            loading = false
+        }
     }
 
     LaunchedEffect(Unit) { refresh() }
@@ -174,7 +179,11 @@ private fun ErrorBanner(message: String, onRetry: () -> Unit) {
 @Composable
 private fun LabelValue(label: String, value: String, bold: Boolean = false) {
     Column {
-        Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(
+            label,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
         Text(
             value,
             style = if (bold) MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold)

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="256" height="256" viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Mask: white = visible, black = hidden (transparent) -->
+    <mask id="cutouts">
+      <rect width="100%" height="100%" fill="white"/>
+      <g fill="black">
+        <rect x="56" y="84"  width="144" height="20" rx="10"/>
+        <rect x="56" y="118" width="144" height="20" rx="10"/>
+        <rect x="56" y="152" width="144" height="20" rx="10"/>
+      </g>
+    </mask>
+  </defs>
+
+  <!-- White circle; the mask makes the three bars transparent -->
+  <circle cx="128" cy="128" r="110" fill="white" mask="url(#cutouts)"/>
+</svg>

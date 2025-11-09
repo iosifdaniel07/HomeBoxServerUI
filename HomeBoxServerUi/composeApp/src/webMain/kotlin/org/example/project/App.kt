@@ -36,7 +36,9 @@ fun App() {
             }
 
             Screen.DISK_SPACE -> {
-                DiskSpaceScreen()
+                DiskSpaceScreen{
+                    currentScreen = it
+                }
             }
         }
     }
