@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -115,20 +114,7 @@ fun HomeScreen(username: String, onMenuSelected: (screen: Screen) -> Unit) {
 
             // Header (welcome + logout)
             item {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(MaterialTheme.colorScheme.surface)
-                        .padding(2.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "Welcome, $username!",
-                        style = MaterialTheme.typography.headlineSmall
-                    )
-                    TopBar(Screen.HOME, onMenuSelected)
-                }
+                TopBar(Screen.HOME, onMenuSelected)
                 HorizontalDivider(
                     Modifier.padding(vertical = 0.dp),
                     DividerDefaults.Thickness,

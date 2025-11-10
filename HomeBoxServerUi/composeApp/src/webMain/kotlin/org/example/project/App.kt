@@ -3,10 +3,10 @@ package org.example.project
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 
-enum class Screen {
-    LOGIN,
-    HOME,
-    DISK_SPACE
+enum class Screen(val text: String) {
+    LOGIN(""),
+    HOME("Search Page"),
+    DISK_SPACE("Disk Management")
 }
 
 @Composable
@@ -36,7 +36,7 @@ fun App() {
             }
 
             Screen.DISK_SPACE -> {
-                DiskSpaceScreen{
+                DiskSpaceScreen {
                     currentScreen = it
                 }
             }
