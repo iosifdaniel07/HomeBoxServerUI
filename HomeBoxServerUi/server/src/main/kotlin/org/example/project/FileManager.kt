@@ -76,7 +76,7 @@ object FileManager {
                 .map { p ->
                     val attrs = Files.readAttributes(p, BasicFileAttributes::class.java)
                     val isDir = attrs.isDirectory
-                    val size = if (isDir) 0L else attrs.size()
+                    val size = attrs.size()
                     FileEntry(
                         name = p.name,
                         pathRel = base.relativize(p).toString(),
@@ -84,7 +84,8 @@ object FileManager {
                         sizeBytes = size,
                         modifiedEpochMs = attrs.lastModifiedTime().toMillis(),
                         readable = Files.isReadable(p),
-                        writable = Files.isWritable(p)
+                        writable = Files.isWritable(p),
+                        emptyList()
                     )
                 }
                 .toList()
@@ -110,9 +111,13 @@ object FileManager {
 
             // Handle directory deletion
             if (target.isDirectory()) {
-                if (!recursive) return OpResult(false, "Refusing to delete directory without recursive=true")
+                if (!recursive) return OpResult(
+                    false,
+                    "Refusing to delete directory without recursive=true"
+                )
                 // Recursively delete the directory using walk
-                Files.walk(target).sorted(Comparator.reverseOrder()).forEach { Files.deleteIfExists(it) }
+                Files.walk(target).sorted(Comparator.reverseOrder())
+                    .forEach { Files.deleteIfExists(it) }
                 OpResult(true, "Directory deleted: ${base.relativize(target)}")
             } else {
                 // Delete a regular file

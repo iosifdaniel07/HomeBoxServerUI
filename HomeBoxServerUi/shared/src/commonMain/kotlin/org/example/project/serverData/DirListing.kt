@@ -8,7 +8,8 @@ data class FileEntry(
     val sizeBytes: Long,      // file size; for directory it's 0 unless you ask to compute
     val modifiedEpochMs: Long,
     val readable: Boolean,
-    val writable: Boolean
+    val writable: Boolean,
+    val children: List<FileEntry>
 )
 
 @kotlinx.serialization.Serializable

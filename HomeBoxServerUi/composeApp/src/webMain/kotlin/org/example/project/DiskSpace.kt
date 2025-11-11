@@ -10,11 +10,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -29,7 +27,6 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import org.example.project.serverData.FilesystemUsage
 import androidx.compose.material3.ElevatedCard
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -221,7 +218,7 @@ private fun usageColor(percent: Int): Color = when {
 @Composable
 fun FileItem(fileEntry: FileEntry, onDelete: (name: String) -> Unit) {
     ElevatedCard(
-        modifier = Modifier.padding(14.dp),
+        modifier = Modifier.padding(start = 14.dp, end = 14.dp),
         shape = MaterialTheme.shapes.medium,
         onClick = {
             onDelete(fileEntry.name)
