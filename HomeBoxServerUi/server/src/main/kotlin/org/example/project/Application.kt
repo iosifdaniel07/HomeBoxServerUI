@@ -14,6 +14,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.example.project.searchData.SearchCompleteItem
 
+const val desired = "/home/daniel/Desktop/testt"
+
 fun main() {
     embeddedServer(Netty, port = SERVER_PORT, host = "0.0.0.0", module = Application::module)
         .start(wait = true)
@@ -32,6 +34,11 @@ fun Application.module() {
 
 
     val client = FilelistClient()
+
+    println(desired)
+    val baseCfg = FileManager.configureExistingBase(desired)
+    require(baseCfg.ok) { baseCfg.message }
+
 
     routing {
 
@@ -64,6 +71,17 @@ fun Application.module() {
         get("/diskSpace") {
             val usage = withContext(Dispatchers.IO) { getAllDiskUsage() }
             call.respond(usage)
+        }
+
+        get("/dirData") {
+            val usage = withContext(Dispatchers.IO) { FileManager.list() }
+            call.respond(usage)
+        }
+
+        post("/deleteFile") {
+            val fileName = call.receive<String>()
+            val deleted = withContext(Dispatchers.IO) { FileManager.deleteFile(fileName) }
+            call.respond(deleted.ok)
         }
     }
 }
