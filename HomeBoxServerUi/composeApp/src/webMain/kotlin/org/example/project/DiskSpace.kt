@@ -17,7 +17,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Divider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
@@ -55,7 +54,14 @@ fun DiskSpaceScreen(onMenuSelected: (screen: Screen) -> Unit) {
     var error by remember { mutableStateOf<String?>(null) }
     val client = Client
     val scope = rememberCoroutineScope()
-    var showDeleteDialog: Pair<Boolean, String?> by remember { mutableStateOf(Pair(false, null)) }
+    var showDeleteDialog: Pair<Boolean, FileEntry?> by remember {
+        mutableStateOf(
+            Pair(
+                false,
+                null
+            )
+        )
+    }
     var errorDelete by remember { mutableStateOf<String?>(null) }
 
     fun refresh() = scope.launch {
@@ -81,14 +87,14 @@ fun DiskSpaceScreen(onMenuSelected: (screen: Screen) -> Unit) {
     Scaffold { padding ->
 
         key(showDeleteDialog) {
-            if (showDeleteDialog.first) {
+            if (showDeleteDialog.first && showDeleteDialog.second?.isDir == false) {
                 DeleteConfirmationDialog(
                     onConfirm = {
                         showDeleteDialog.second?.let { file ->
                             scope.launch {
-                                val isSucceed = client.deleteFile(file)
+                                val isSucceed = client.deleteFile(file.name)
                                 if (isSucceed) {
-                                    items = items?.filter { it.name != file }
+                                    items = items?.filter { it != file }
                                 } else {
                                     errorDelete = "Failed to delete ${file}. Please try again."
                                 }
@@ -99,7 +105,7 @@ fun DiskSpaceScreen(onMenuSelected: (screen: Screen) -> Unit) {
                     onDismiss = {
                         showDeleteDialog = false to null// Close the dialog
                     },
-                    file = showDeleteDialog.second
+                    file = showDeleteDialog.second?.name
                 )
             }
         }
@@ -148,14 +154,15 @@ fun DiskSpaceScreen(onMenuSelected: (screen: Screen) -> Unit) {
                     Text(
                         text = "Files",
                         style = MaterialTheme.typography.titleMedium,
-                        modifier = Modifier.padding(start = 14.dp, bottom = 8.dp) // Adds space between the label and the card
+                        modifier = Modifier.padding(
+                            start = 14.dp,
+                            bottom = 8.dp
+                        ) // Adds space between the label and the card
                     )
                 }
                 items(items = items) { fileEntry ->
                     FileItem(fileEntry) {
-                        scope.launch {
-                            showDeleteDialog = true to fileEntry.name
-                        }
+                        showDeleteDialog = true to fileEntry
                     }
                 }
             }
