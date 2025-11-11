@@ -59,11 +59,15 @@ fun HomeScreen(username: String, onMenuSelected: (screen: Screen) -> Unit) {
     var pagesPair by remember { mutableStateOf(Pair(1, 1)) }
     var currentSearchItem by remember { mutableStateOf(CurrentSearchItem("", 0, 0, 0)) }
     var isInitialLoad by remember { mutableStateOf(true) }
-
+    var error by remember { mutableStateOf<String?>(null) }
 
     suspend fun loadInitialData() {
         try {
+            error = null
             val firstSearch = client.firstSearch()
+            if (firstSearch.searchItems.isEmpty()) {
+                error = "Something went wrong, 0 items fetched..."
+            }
             firstSearch.searchFiltersData.let {
                 searchInOptions = it.searchInOptionsList.toMutableList()
                 selectedSearchIn = it.selectedSearchIn ?: searchInOptions.firstOrNull()
@@ -87,7 +91,7 @@ fun HomeScreen(username: String, onMenuSelected: (screen: Screen) -> Unit) {
                 selectedSort?.value ?: 0
             )
         } catch (e: Exception) {
-
+            error = e.message
         }
     }
 
@@ -111,6 +115,16 @@ fun HomeScreen(username: String, onMenuSelected: (screen: Screen) -> Unit) {
             verticalArrangement = Arrangement.spacedBy(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
+
+            item {
+                if (error != null) {
+                    ErrorBanner(message = error!!, onRetry = {
+                        scope.launch {
+                            loadInitialData()
+                        }
+                    })
+                }
+            }
 
             // Header (welcome + logout)
             item {

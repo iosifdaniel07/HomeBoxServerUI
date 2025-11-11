@@ -17,6 +17,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Divider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
@@ -30,6 +31,7 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import org.example.project.serverData.FilesystemUsage
 import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -76,9 +78,7 @@ fun DiskSpaceScreen(onMenuSelected: (screen: Screen) -> Unit) {
         }
     }
 
-    Scaffold(
-
-    ) { padding ->
+    Scaffold { padding ->
 
         key(showDeleteDialog) {
             if (showDeleteDialog.first) {
@@ -135,7 +135,22 @@ fun DiskSpaceScreen(onMenuSelected: (screen: Screen) -> Unit) {
                 }
             }
 
+            item {
+                HorizontalDivider(
+                    color = Color.Gray, // Line color
+                    thickness = 1.dp,    // Line thickness
+                    modifier = Modifier.padding(vertical = 16.dp) // Padding around the divider
+                )
+            }
+
             items?.let { items ->
+                item {
+                    Text(
+                        text = "Files",
+                        style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier.padding(start = 14.dp, bottom = 8.dp) // Adds space between the label and the card
+                    )
+                }
                 items(items = items) { fileEntry ->
                     FileItem(fileEntry) {
                         scope.launch {
@@ -154,57 +169,65 @@ fun DiskSpaceScreen(onMenuSelected: (screen: Screen) -> Unit) {
 
 @Composable
 private fun FilesystemCard(fs: FilesystemUsage) {
-    ElevatedCard {
-        Column(Modifier.padding(14.dp)) {
-            Text(
-                fs.filesystem,
-                style = MaterialTheme.typography.titleMedium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            Text(
-                fs.mount,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
+    Column {
+        Text(
+            text = "Disk Space",
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.padding(bottom = 16.dp) // Adds space between the label and the card
+        )
 
-            Spacer(Modifier.height(10.dp))
-
-            LinearProgressIndicator(
-                progress = { fs.usePercent.coerceIn(0, 100) / 100f },
-                color = usageColor(fs.usePercent),
-                trackColor = MaterialTheme.colorScheme.surfaceVariant,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(10.dp)
-            )
-
-            Spacer(Modifier.height(10.dp))
-
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                LabelValue("Total", fs.total, bold = true)
-                Dot()
-                LabelValue("Used", fs.used)
-                Dot()
-                LabelValue("Avail", fs.avail)
-                Spacer(Modifier.weight(1f))
+        ElevatedCard {
+            Column(Modifier.padding(14.dp)) {
                 Text(
-                    "${fs.usePercent}%",
-                    style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
-                    color = usageColor(fs.usePercent)
+                    fs.filesystem,
+                    style = MaterialTheme.typography.titleMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
+                Text(
+                    fs.mount,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+
+                Spacer(Modifier.height(10.dp))
+
+                LinearProgressIndicator(
+                    progress = { fs.usePercent.coerceIn(0, 100) / 100f },
+                    color = usageColor(fs.usePercent),
+                    trackColor = MaterialTheme.colorScheme.surfaceVariant,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(10.dp)
+                )
+
+                Spacer(Modifier.height(10.dp))
+
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    LabelValue("Total", fs.total, bold = true)
+                    Dot()
+                    LabelValue("Used", fs.used)
+                    Dot()
+                    LabelValue("Avail", fs.avail)
+                    Spacer(Modifier.weight(1f))
+                    Text(
+                        "${fs.usePercent}%",
+                        style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
+                        color = usageColor(fs.usePercent)
+                    )
+                }
             }
         }
     }
 }
 
 @Composable
-private fun ErrorBanner(message: String, onRetry: () -> Unit) {
+fun ErrorBanner(message: String, onRetry: () -> Unit) {
     Surface(
         shape = MaterialTheme.shapes.medium,
         color = MaterialTheme.colorScheme.errorContainer,
