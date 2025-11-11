@@ -1,5 +1,6 @@
 package org.example.project
 
+import kotlinx.io.files.FileNotFoundException
 import org.example.project.serverData.DirListing
 import org.example.project.serverData.FileEntry
 import org.example.project.serverData.OpResult
@@ -62,34 +63,20 @@ object FileManager {
     /** List a directory. Hidden files are skipped by default. */
     fun list(
         relDir: String = ".",
-        includeHidden: Boolean = false
+        includeHidden: Boolean = false,
+        followSymlinks: Boolean = false
     ): DirListing {
         val base = baseDir()
         val dir = resolveSafe(relDir)
         if (!dir.exists()) throw NoSuchFileException("Not found: $relDir")
         if (!dir.isDirectory()) throw NotDirectoryException(dir.toString())
 
-        val entries = Files.list(dir).use { stream ->
-            stream
-                .filter { includeHidden || !it.name.startsWith(".") }
-                .sorted()
-                .map { p ->
-                    val attrs = Files.readAttributes(p, BasicFileAttributes::class.java)
-                    val isDir = attrs.isDirectory
-                    val size = attrs.size()
-                    FileEntry(
-                        name = p.name,
-                        pathRel = base.relativize(p).toString(),
-                        isDir = isDir,
-                        sizeBytes = size,
-                        modifiedEpochMs = attrs.lastModifiedTime().toMillis(),
-                        readable = Files.isReadable(p),
-                        writable = Files.isWritable(p),
-                        emptyList()
-                    )
-                }
-                .toList()
-        }
+        val entries = listOneLevel(
+            base = base,
+            dir = dir,
+            includeHidden = includeHidden,
+            followSymlinks = followSymlinks
+        ).sortedWith(entryComparator())
 
         return DirListing(
             base = base.toString(),
@@ -97,6 +84,88 @@ object FileManager {
             entries = entries
         )
     }
+
+    /** List immediate children of a directory, filtering hidden if needed. */
+    private fun listOneLevel(
+        base: Path,
+        dir: Path,
+        includeHidden: Boolean,
+        followSymlinks: Boolean
+    ): List<FileEntry> {
+        Files.list(dir).use { stream ->
+            return stream
+                .filter { path ->
+                    if (includeHidden) true
+                    else !(path.fileName?.toString()?.startsWith(".") ?: false)
+                }
+                .map { p -> buildEntry(base, p, includeHidden, followSymlinks) }
+                .toList()
+        }
+    }
+
+    /** Build a FileEntry for a path (recursively if directory). */
+    private fun buildEntry(
+        base: Path,
+        p: Path,
+        includeHidden: Boolean,
+        followSymlinks: Boolean
+    ): FileEntry {
+        if (!Files.exists(p)) {
+            throw IllegalArgumentException("Path does not exist: $p")
+        }
+
+        val name = p.fileName?.toString() ?: p.toString()
+
+        val attrs: BasicFileAttributes
+        try {
+            // Try reading attributes while considering symlinks
+            attrs = if (followSymlinks) {
+                Files.readAttributes(p, BasicFileAttributes::class.java)
+            } else {
+                Files.readAttributes(p, BasicFileAttributes::class.java, LinkOption.NOFOLLOW_LINKS)
+            }
+        } catch (e: FileNotFoundException) {
+            throw IllegalStateException("File not found: $p", e)
+        } catch (e: InvalidPathException) {
+            throw IllegalStateException("Invalid path: $p", e)
+        } catch (e: Exception) {
+            // Log the specific error for better debugging
+            throw IllegalStateException("Failed to read attributes for path: $p", e)
+        }
+
+        val isDir = attrs.isDirectory
+        val isSymlink = attrs.isSymbolicLink
+
+        // Handle symlinks and directories carefully
+        val children: List<FileEntry> =
+            if (isDir && (!isSymlink || followSymlinks)) {
+                listOneLevel(base, p, includeHidden, followSymlinks)
+                    .sortedWith(entryComparator())
+            } else emptyList()
+
+        val sizeBytes: Long =
+            if (children.isEmpty()) {
+                // File or empty directory: for regular file use actual size; for dir with no children it's 0
+                attrs.size()
+            } else {
+                // Directory with children: sum of descendant file sizes
+                children.sumOf { it.sizeBytes }
+            }
+
+        return FileEntry(
+            name = name,
+            pathRel = base.relativize(p).toString(),
+            isDir = isDir,
+            sizeBytes = sizeBytes,
+            modifiedEpochMs = attrs.lastModifiedTime().toMillis(),
+            readable = Files.isReadable(p),
+            writable = Files.isWritable(p),
+            children = children
+        )
+    }
+
+    private fun entryComparator(): Comparator<FileEntry> =
+        compareBy<FileEntry>({ if (it.isDir) 0 else 1 }, { it.name.lowercase() })
 
     fun deleteFile(
         fileName: String,  // Use fileName as the input parameter
