@@ -1,6 +1,5 @@
 package org.example.project
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -14,6 +13,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DividerDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -60,10 +60,12 @@ fun HomeScreen(username: String, onMenuSelected: (screen: Screen) -> Unit) {
     var currentSearchItem by remember { mutableStateOf(CurrentSearchItem("", 0, 0, 0)) }
     var isInitialLoad by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
+    var isLoading by remember { mutableStateOf<Boolean>(true) }
 
     suspend fun loadInitialData() {
         try {
             error = null
+            isLoading = true
             val firstSearch = client.firstSearch()
             if (firstSearch.searchItems.isEmpty()) {
                 error = "Something went wrong, 0 items fetched..."
@@ -90,7 +92,9 @@ fun HomeScreen(username: String, onMenuSelected: (screen: Screen) -> Unit) {
                 selectedSearchIn?.value ?: 0,
                 selectedSort?.value ?: 0
             )
+            isLoading = false
         } catch (e: Exception) {
+            isLoading = false
             error = e.message
         }
     }
@@ -115,16 +119,6 @@ fun HomeScreen(username: String, onMenuSelected: (screen: Screen) -> Unit) {
             verticalArrangement = Arrangement.spacedBy(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-
-            item {
-                if (error != null) {
-                    ErrorBanner(message = error!!, onRetry = {
-                        scope.launch {
-                            loadInitialData()
-                        }
-                    })
-                }
-            }
 
             // Header (welcome + logout)
             item {
@@ -262,6 +256,21 @@ fun HomeScreen(username: String, onMenuSelected: (screen: Screen) -> Unit) {
                             }
                         }
                     )
+                }
+            }
+
+            //loading + error
+            item {
+                key(error, isLoading, searchItems) {
+                    if (error != null) {
+                        ErrorBanner(message = error!!, onRetry = {
+                            scope.launch {
+                                loadInitialData()
+                            }
+                        })
+                    } else if (searchItems.isEmpty() && isLoading) {
+                        CircularProgressIndicator()
+                    }
                 }
             }
 
