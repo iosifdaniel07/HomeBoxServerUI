@@ -13,6 +13,8 @@ import io.ktor.server.request.receive
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.example.project.searchData.SearchCompleteItem
+import org.example.project.serverData.DeleteItem
+import org.example.project.serverData.DeleteResponse
 
 const val desired = "/home/daniel/Desktop/testt"
 
@@ -79,9 +81,10 @@ fun Application.module() {
         }
 
         post("/deleteFile") {
-            val fileName = call.receive<String>()
-            val deleted = withContext(Dispatchers.IO) { FileManager.deleteFile(fileName) }
-            call.respond(deleted.ok)
+            val fileName = call.receive<DeleteItem>()
+            println("delete file: ${fileName}")
+            val deleted = withContext(Dispatchers.IO) { FileManager.deleteFile(fileName.item) }
+            call.respond(DeleteResponse(deleted.ok))
         }
     }
 }

@@ -42,6 +42,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import kotlinx.coroutines.delay
+import org.example.project.serverData.DeleteItem
 import org.example.project.serverData.FileEntry
 
 
@@ -49,7 +50,7 @@ import org.example.project.serverData.FileEntry
 fun DiskSpaceScreen(onMenuSelected: (screen: Screen) -> Unit) {
 
     var data by remember { mutableStateOf<FilesystemUsage?>(null) }
-    var items by remember { mutableStateOf<List<FileEntry>?>(null) }
+    var itemsList by remember { mutableStateOf<List<FileEntry>?>(null) }
     var loading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
     val client = Client
@@ -68,7 +69,7 @@ fun DiskSpaceScreen(onMenuSelected: (screen: Screen) -> Unit) {
         loading = true; error = null
         try {
             data = client.diskSize()
-            items = client.list().entries
+            itemsList = client.list().entries
         } catch (t: Throwable) {
             error = t.message ?: t.toString()
         } finally {
@@ -89,24 +90,47 @@ fun DiskSpaceScreen(onMenuSelected: (screen: Screen) -> Unit) {
         key(showDeleteDialog) {
             if (showDeleteDialog.first && showDeleteDialog.second?.isDir == false) {
                 DeleteConfirmationDialog(
-                    onConfirm = {
-                        showDeleteDialog.second?.let { file ->
-                            scope.launch {
-                                val isSucceed = client.deleteFile(file.name)
-                                if (isSucceed) {
-                                    items = items?.filter { it != file }
-                                } else {
-                                    errorDelete = "Failed to delete ${file}. Please try again."
-                                }
+                    onConfirm = { item ->
+                        scope.launch {
+                            println("single delete ${item}")
+                            val isSucceed = client.deleteFile(DeleteItem(item))
+                            if (isSucceed) {
+                                itemsList = client.list().entries
+                            } else {
+                                errorDelete = "Failed to delete ${item}. Please try again."
                             }
+                            showDeleteDialog = false to null // Close the dialog
                         }
-                        showDeleteDialog = false to null // Close the dialog
                     },
                     onDismiss = {
                         showDeleteDialog = false to null// Close the dialog
                     },
                     file = showDeleteDialog.second?.name
                 )
+            }
+            if (showDeleteDialog.first && showDeleteDialog.second?.isDir == true) {
+                showDeleteDialog.second?.let { item ->
+                    DeleteListConfirmationDialog(
+                        onConfirm = { itemToDelete ->
+                            scope.launch {
+                                println("DeleteListConfirmation ${itemToDelete}")
+                                val isSucceed = client.deleteFile(DeleteItem(itemToDelete))
+                                if (isSucceed) {
+                                    itemsList = client.list().entries
+                                } else {
+                                    errorDelete =
+                                        "Failed to delete ${itemToDelete}. Please try again."
+                                }
+                                showDeleteDialog = false to null // Close the dialog
+                            }
+                        },
+                        onDismiss = {
+                            showDeleteDialog = false to null
+                        },
+                        file = item,
+                        directory = item.name, //first directory should be null..
+                    )
+                }
             }
         }
 
@@ -149,7 +173,7 @@ fun DiskSpaceScreen(onMenuSelected: (screen: Screen) -> Unit) {
                 )
             }
 
-            items?.let { items ->
+            itemsList?.let { items ->
                 item {
                     Text(
                         text = "Files",
@@ -324,7 +348,11 @@ fun formatSize(bytes: Long): String {
 }
 
 @Composable
-fun DeleteConfirmationDialog(file: String?, onConfirm: () -> Unit, onDismiss: () -> Unit) {
+fun DeleteConfirmationDialog(
+    file: String?,
+    onConfirm: (item: String) -> Unit,
+    onDismiss: () -> Unit
+) {
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
@@ -334,7 +362,98 @@ fun DeleteConfirmationDialog(file: String?, onConfirm: () -> Unit, onDismiss: ()
             Text("Are you sure you want to delete ${file}?")
         },
         confirmButton = {
-            TextButton(onClick = onConfirm) {
+            TextButton(onClick = {
+                file?.let {
+                    onConfirm(it)
+                }
+            }) {
+                Text("Yes")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("No")
+            }
+        }
+    )
+}
+
+@Composable
+fun DeleteListConfirmationDialog(
+    file: FileEntry,
+    directory: String?,
+    onConfirm: (item: String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var showDialog by remember { mutableStateOf(false) }
+    var selectedChild by remember { mutableStateOf<FileEntry?>(null) }
+
+    if (showDialog && selectedChild != null) {
+        selectedChild?.let { item ->
+            val itemPath: String = if (directory == null) {
+                item.name
+            } else {
+                "$directory/${item.name}"
+            }
+            if (item.isDir) {
+                DeleteListConfirmationDialog(item, itemPath, { item ->
+                    onConfirm(item)
+                    if (selectedChild?.name == item) {
+                        showDialog = false
+                    }
+                }, {
+                    showDialog = false
+                })
+            } else {
+                DeleteConfirmationDialog(
+                    file = itemPath,
+                    onConfirm = {
+                        onConfirm(itemPath)
+                        showDialog = false
+                    },
+                    onDismiss = {
+                        showDialog = false
+                    }
+                )
+            }
+        }
+    }
+
+    AlertDialog(
+        modifier = Modifier.fillMaxSize(),
+        onDismissRequest = onDismiss,
+        title = {
+            Text(text = "Delete File")
+        },
+        text = {
+            Column {
+
+                Text("Are you sure you want to delete ${file.name}?")
+
+                Text(text = "This file contains the following items:")
+
+                HorizontalDivider(modifier = Modifier.padding(4.dp))
+
+                LazyColumn(
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier.fillMaxWidth().wrapContentHeight()
+                ) {
+                    items(items = file.children) { fileEntry ->
+                        FileItem(fileEntry) {
+                            selectedChild = fileEntry
+                            showDialog = true
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                val dir: String = directory ?: file.name
+                println("on confirm ${dir}")
+                onConfirm(dir)
+                onDismiss()
+            }) {
                 Text("Yes")
             }
         },

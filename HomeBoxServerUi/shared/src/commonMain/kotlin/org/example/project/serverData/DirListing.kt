@@ -9,7 +9,7 @@ data class FileEntry(
     val modifiedEpochMs: Long,
     val readable: Boolean,
     val writable: Boolean,
-    val children: List<FileEntry>
+    var children: List<FileEntry>
 )
 
 @kotlinx.serialization.Serializable
@@ -24,4 +24,14 @@ data class DirListing(
 data class OpResult(
     val ok: Boolean,
     val message: String
+)
+
+@kotlinx.serialization.Serializable
+data class DeleteItem(
+    val item: String
+)
+
+@kotlinx.serialization.Serializable
+data class DeleteResponse(
+    val result: Boolean
 )
