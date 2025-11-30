@@ -36,6 +36,9 @@ fun TopBar(currentScreen: Screen, onMenuSelected: (screen: Screen) -> Unit) {
             ActionItem("diskDetails", Screen.DISK_SPACE.text, screen = Screen.DISK_SPACE) {
                 onMenuSelected(Screen.DISK_SPACE)
             },
+            ActionItem("downloadManagement", Screen.DOWNLOAD_MANAGEMENT.text, screen = Screen.DOWNLOAD_MANAGEMENT) {
+                onMenuSelected(Screen.DOWNLOAD_MANAGEMENT)
+            },
             ActionItem("searchPage", Screen.HOME.text, screen = Screen.HOME) {
                 onMenuSelected(Screen.HOME)
             },

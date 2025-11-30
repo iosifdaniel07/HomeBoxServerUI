@@ -15,6 +15,7 @@ import kotlinx.coroutines.withContext
 import org.example.project.searchData.SearchCompleteItem
 import org.example.project.serverData.DeleteItem
 import org.example.project.serverData.DeleteResponse
+import org.example.project.serverData.DownloadItem
 
 const val desired = "/home/daniel/Desktop/testt"
 
@@ -35,11 +36,11 @@ fun Application.module() {
     }
 
 
-    val client = FilelistClient()
+    val filelistClient = FilelistClient()
 
-    println(desired)
-    val baseCfg = FileManager.configureExistingBase(desired)
-    require(baseCfg.ok) { baseCfg.message }
+   // println(desired)
+   /* val baseCfg = FileManager.configureExistingBase(desired) //todo: enable
+    require(baseCfg.ok) { baseCfg.message }*/
 
 
     routing {
@@ -52,13 +53,13 @@ fun Application.module() {
             val loginRequest = call.receive<LoginRequest>()
 
             // First, attempt login
-            val success = client.login(loginRequest.username, loginRequest.password)
+            val success = filelistClient.login(loginRequest.username, loginRequest.password)
             call.respond(HttpStatusCode.OK, LoginResponse(success))
         }
 
         get("/firstSearch") {
             println("first search")
-            val results = client.firstSearch()
+            val results = filelistClient.firstSearch()
             call.respond(HttpStatusCode.OK, results)
         }
 
@@ -66,7 +67,7 @@ fun Application.module() {
             println("search")
             val searchItem = call.receive<SearchCompleteItem>()
             println(searchItem)
-            val results = client.search(searchItem)
+            val results = filelistClient.search(searchItem)
             call.respond(HttpStatusCode.OK, results)
         }
 
@@ -85,6 +86,19 @@ fun Application.module() {
             println("delete file: ${fileName}")
             val deleted = withContext(Dispatchers.IO) { FileManager.deleteFile(fileName.item) }
             call.respond(DeleteResponse(deleted.ok))
+        }
+
+        get("/qBittorrentRunning") {
+            val isInstalled =
+                withContext(Dispatchers.IO) { QBittorrentUtils.isQbittorrentRunning() }
+            call.respond(isInstalled)
+        }
+
+        post("/downloadFile"){
+            val item = call.receive<DownloadItem>()
+            val response =
+                withContext(Dispatchers.IO) { filelistClient.downloadFile(item.itemId)}
+            call.respond(response)
         }
     }
 }

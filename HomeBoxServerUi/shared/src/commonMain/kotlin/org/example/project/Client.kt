@@ -4,6 +4,7 @@ import io.ktor.client.*
 import io.ktor.client.call.body
 import io.ktor.client.request.*
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.client.statement.HttpResponse
 import io.ktor.http.ContentType
 import io.ktor.http.contentType
 import io.ktor.serialization.kotlinx.json.*
@@ -13,6 +14,8 @@ import org.example.project.searchData.SearchResponse
 import org.example.project.serverData.DeleteItem
 import org.example.project.serverData.DeleteResponse
 import org.example.project.serverData.DirListing
+import org.example.project.serverData.DownloadItem
+import org.example.project.serverData.DownloadStatus
 import org.example.project.serverData.FilesystemUsage
 
 
@@ -66,6 +69,21 @@ object Client {
             setBody(file)
         }.body()
         return response.result
+    }
+
+
+    suspend fun qBittorentRunning(): Boolean {
+        val response: Boolean = client.get("http://${host}:8085/qBittorrentRunning") {
+        }.body()
+        return response
+    }
+
+    suspend fun downloadFile(item: DownloadItem): Boolean {
+        val response: DownloadStatus = client.post("http://${host}:8085/downloadFile"){
+            contentType(ContentType.Application.Json)
+            setBody(item)
+        }.body()
+        return response.downloadingStarted
     }
 
     // Clean up resources when done

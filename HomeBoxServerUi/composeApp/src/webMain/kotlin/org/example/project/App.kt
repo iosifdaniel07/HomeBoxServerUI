@@ -6,7 +6,8 @@ import androidx.compose.runtime.*
 enum class Screen(val text: String) {
     LOGIN(""),
     HOME("Search Page"),
-    DISK_SPACE("Disk Management")
+    DISK_SPACE("Disk Management"),
+    DOWNLOAD_MANAGEMENT("Download Management")
 }
 
 @Composable
@@ -37,6 +38,12 @@ fun App() {
 
             Screen.DISK_SPACE -> {
                 DiskSpaceScreen {
+                    currentScreen = it
+                }
+            }
+
+            Screen.DOWNLOAD_MANAGEMENT -> {
+                DownloadManagementScreen {
                     currentScreen = it
                 }
             }

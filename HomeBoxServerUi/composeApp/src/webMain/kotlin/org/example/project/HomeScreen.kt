@@ -41,6 +41,7 @@ import org.example.project.searchData.SearchFilters
 import org.example.project.searchData.SearchInOptions
 import org.example.project.searchData.SearchItem
 import org.example.project.searchData.SortOptions
+import org.example.project.serverData.DownloadItem
 import org.jetbrains.compose.resources.painterResource
 
 @Composable
@@ -285,7 +286,11 @@ fun HomeScreen(username: String, onMenuSelected: (screen: Screen) -> Unit) {
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp)
                 ) {
-                    ItemCardView(item)
+                    ItemCardView(item){ id ->
+                        scope.launch {
+                            client.downloadFile(DownloadItem(item.id))
+                        }
+                    }
                 }
             }
 

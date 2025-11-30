@@ -33,7 +33,7 @@ import coil3.compose.AsyncImage
 import org.example.project.searchData.SearchItem
 
 @Composable
-fun ItemCardView(item: SearchItem) {
+fun ItemCardView(item: SearchItem, onDownloadItem: (itemId: String) -> Unit) {
     Card(
         modifier = Modifier
             .wrapContentWidth()
@@ -146,10 +146,8 @@ fun ItemCardView(item: SearchItem) {
                     )
 
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        /* TextButton(onClick = { /* open details */ }) {
-                             Text("Details")
-                         }*/
-                        TextButton(onClick = { /* start download */ }) {
+
+                        TextButton(onClick = { onDownloadItem(item.id) }) {
                             Text("Download")
                         }
                     }

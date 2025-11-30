@@ -1,6 +1,7 @@
 package org.example.project
 
 import io.ktor.client.*
+import io.ktor.client.call.body
 import io.ktor.client.plugins.cookies.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
@@ -8,9 +9,10 @@ import io.ktor.http.*
 import org.example.project.searchData.FirstSearchResponse
 import org.example.project.searchData.SearchCompleteItem
 import org.example.project.searchData.SearchFiltersData
-import org.example.project.searchData.SearchItem
 import org.example.project.searchData.SearchResponse
+import org.example.project.serverData.DownloadStatus
 import org.jsoup.Jsoup
+import java.io.File
 
 /**
  * HTTP client for filelist.io login
@@ -28,7 +30,7 @@ class FilelistClient {
     var cachedValidator: String? = null
     var cookiesHeader: String? = null
 
-    val searchHeaders: HttpRequestBuilder.() -> Unit = {
+    val headers: HttpRequestBuilder.() -> Unit = {
         header(
             HttpHeaders.Accept,
             "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8"
@@ -52,7 +54,7 @@ class FilelistClient {
             HttpHeaders.UserAgent,
             "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36"
         )
-        //header("Cookie", cookiesHeader)
+        //header("Cookie", cookiesHeader) //todo...check the flow here...
         header(
             "Cookie",
             "PHPSESSID=apmbbir6uuvbhpol2lpiliteu8; uid=1411920; pass=d8db42735ab25cb809ab5b9ef6b07b11"
@@ -121,10 +123,45 @@ class FilelistClient {
         }
     }
 
+    suspend fun downloadFile(itemId: String): DownloadStatus {
+        println("donwload item: $itemId")
+       val response = client.post("https://filelist.io/download.php?id=${itemId}") {
+            headers()
+        }
+
+        if (!response.status.isSuccess()) {
+            return DownloadStatus(false, error = "HTTP ${response.status}")
+        }
+
+        val bytes: ByteArray = response.body()
+        val header = response.headers[HttpHeaders.ContentDisposition]
+        val fileNameFromHeader = header
+            ?.substringAfter("filename=\"", missingDelimiterValue = "")
+            ?.substringBefore("\"", missingDelimiterValue = "")
+            ?.takeIf { it.isNotBlank() }
+
+        val fileName = fileNameFromHeader
+        if(fileName == null){
+            return DownloadStatus(false, error = "No filename in header")
+        }
+        val home = System.getProperty("home")
+        val downloadsDir = File(home, "TorrentsDownloads")
+        if (!downloadsDir.exists()) {
+            downloadsDir.mkdirs()
+        }
+
+        val outFile = File(downloadsDir, fileName)
+        outFile.writeBytes(bytes)
+
+        println("Saved to: ${outFile.absolutePath}")
+
+        return DownloadStatus(true)
+    }
+
     suspend fun firstSearch(): FirstSearchResponse {
         try {
             val response = client.get("https://filelist.io/browse.php") {
-                searchHeaders()
+                headers()
             }
             println("status" + response.status)
             println("headers:..." + response.headers)
@@ -151,7 +188,7 @@ class FilelistClient {
     suspend fun search(searchItem: SearchCompleteItem): SearchResponse {
         try {
             val response = client.get(createSearchUrl(searchItem)) {
-                searchHeaders()
+                headers()
             }
             println("status" + response.status)
             println("headers:..." + response.headers)
