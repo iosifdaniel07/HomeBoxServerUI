@@ -78,12 +78,12 @@ object Client {
         return response
     }
 
-    suspend fun downloadFile(item: DownloadItem): Boolean {
+    suspend fun downloadFile(item: DownloadItem): DownloadStatus {
         val response: DownloadStatus = client.post("http://${host}:8085/downloadFile"){
             contentType(ContentType.Application.Json)
             setBody(item)
         }.body()
-        return response.downloadingStarted
+        return response
     }
 
     // Clean up resources when done

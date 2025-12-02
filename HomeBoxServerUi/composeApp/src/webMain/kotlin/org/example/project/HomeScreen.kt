@@ -10,8 +10,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DividerDefaults
@@ -20,7 +22,9 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -34,6 +38,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import homeboxserverui.composeapp.generated.resources.Res
 import homeboxserverui.composeapp.generated.resources.search
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.example.project.searchData.CategoryOptions
 import org.example.project.searchData.SearchCompleteItem
@@ -62,6 +67,8 @@ fun HomeScreen(username: String, onMenuSelected: (screen: Screen) -> Unit) {
     var isInitialLoad by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
     var isLoading by remember { mutableStateOf<Boolean>(true) }
+    var showDownload: Pair<Boolean, SearchItem?> by remember { mutableStateOf(Pair(false, null)) }
+    var downloadStatus: Pair<String?, String?> by remember { mutableStateOf(Pair(null, null)) }
 
     suspend fun loadInitialData() {
         try {
@@ -103,6 +110,13 @@ fun HomeScreen(username: String, onMenuSelected: (screen: Screen) -> Unit) {
     // Call the API when the page opens
     LaunchedEffect(Unit) {
         loadInitialData()
+    }
+
+    LaunchedEffect(downloadStatus) {
+        downloadStatus.first?.let {
+            delay(3000) // Wait for 5 seconds
+            downloadStatus = null to null// Hide the Toast after 5 seconds
+        }
     }
 
     var searchQuery by remember { mutableStateOf("") }
@@ -286,9 +300,36 @@ fun HomeScreen(username: String, onMenuSelected: (screen: Screen) -> Unit) {
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp)
                 ) {
-                    ItemCardView(item){ id ->
-                        scope.launch {
-                            client.downloadFile(DownloadItem(item.id))
+                    ItemCardView(item) {
+                        showDownload = true to it
+                    }
+
+                    key(showDownload) {
+                        if (showDownload.first) {
+                            showDownload.second?.let {
+                                DownloadDialog(item = it, onConfirm = { item ->
+                                    scope.launch {
+                                        showDownload = false to null
+                                        val response = client.downloadFile(DownloadItem(item.id))
+                                        println(response)
+                                        if (response.downloadingStarted) {
+                                            downloadStatus = DOWNLOADING to item.id
+                                        } else {
+                                            downloadStatus = response.error to item.id
+                                        }
+                                    }
+                                }, onDismiss = {
+                                    showDownload = false to null
+                                })
+                            }
+                        }
+                    }
+
+                    key(downloadStatus) {
+                        if (downloadStatus.first != null && downloadStatus.second == item.id) {
+                            downloadStatus.first?.let {
+                                Notification(message = it)
+                            }
                         }
                     }
                 }
@@ -332,3 +373,51 @@ fun HomeScreen(username: String, onMenuSelected: (screen: Screen) -> Unit) {
     }
 
 }
+
+@Composable
+fun DownloadDialog(
+    item: SearchItem,
+    onConfirm: (item: SearchItem) -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(text = "Are you sure you want to download?")
+        },
+        text = {
+            Text(item.title)
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                onConfirm(item)
+            }) {
+                Text("Yes")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("No")
+            }
+        }
+    )
+}
+
+@Composable
+fun Notification(message: String) {
+    Surface(
+        shape = MaterialTheme.shapes.medium,
+        color = if (message == DOWNLOADING) MaterialTheme.colorScheme.inverseOnSurface else MaterialTheme.colorScheme.error,
+        modifier = Modifier.wrapContentWidth()
+    ) {
+        Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                message,
+                color = MaterialTheme.colorScheme.inverseOnSurface,
+                modifier = Modifier.wrapContentWidth()
+            )
+        }
+    }
+}
+
+const val DOWNLOADING = "Downloading started"

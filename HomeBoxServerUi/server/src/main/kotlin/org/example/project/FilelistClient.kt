@@ -144,7 +144,7 @@ class FilelistClient {
         if(fileName == null){
             return DownloadStatus(false, error = "No filename in header")
         }
-        val home = System.getProperty("home")
+        val home = System.getProperty("user.home")
         val downloadsDir = File(home, "TorrentsDownloads")
         if (!downloadsDir.exists()) {
             downloadsDir.mkdirs()
@@ -152,11 +152,22 @@ class FilelistClient {
 
         val outFile = File(downloadsDir, fileName)
         outFile.writeBytes(bytes)
-
         println("Saved to: ${outFile.absolutePath}")
+
+        val added = QBittorrentUtils.addTorrentFile(
+            bytes = bytes,
+            fileName = fileName,
+            category = null,
+            paused = false
+        )
+
+        if (!added) {
+            return DownloadStatus(false, error = "Failed to add torrent to qBittorrent")
+        }
 
         return DownloadStatus(true)
     }
+
 
     suspend fun firstSearch(): FirstSearchResponse {
         try {
