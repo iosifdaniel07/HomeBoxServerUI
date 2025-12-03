@@ -413,7 +413,7 @@ fun Notification(message: String) {
         Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
             Text(
                 message,
-                color = MaterialTheme.colorScheme.inverseOnSurface,
+                color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.wrapContentWidth()
             )
         }
