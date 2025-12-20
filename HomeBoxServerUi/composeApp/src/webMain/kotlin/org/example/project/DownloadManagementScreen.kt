@@ -11,6 +11,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -21,7 +22,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
 import org.example.project.downloadData.TorrentInfo
 
@@ -43,6 +47,8 @@ fun DownloadManagementScreen(onMenuSelected: (screen: Screen) -> Unit) {
     }
     var deleteError: Pair<String?, String?> by remember { mutableStateOf(Pair(null, null)) }
 
+    val torrentsFlow = remember { getTorrentsStatusFlow(client) }
+    var job: Job? = null
 
     LaunchedEffect(deleteError) {
         deleteError.first?.let {
@@ -60,13 +66,23 @@ fun DownloadManagementScreen(onMenuSelected: (screen: Screen) -> Unit) {
                     error = "QBittorrent is not running"
                 }
                 println(isRunning)
-                torrentsInfo = client.getTorrentsStatus()
-                loading = false
-                println(torrentsInfo)
+                job = launch {
+                    torrentsFlow.collect { newTorrents ->
+                        torrentsInfo = newTorrents
+                        loading = false
+                        println(torrentsInfo)
+                    }
+                }
             } catch (e: Exception) {
                 loading = false
                 error = e.message ?: e.toString()
             }
+        }
+    }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            job?.cancel()  // Cancel the job when the composable is disposed
         }
     }
 
@@ -145,5 +161,16 @@ fun DownloadManagementScreen(onMenuSelected: (screen: Screen) -> Unit) {
                 }
             }
         }
+    }
+}
+
+fun getTorrentsStatusFlow(client: Client): Flow<List<TorrentInfo>> = flow {
+    while (true) {
+        // Simulate API call
+        val torrents = client.getTorrentsStatus()
+        emit(torrents)
+
+        // Delay before fetching again (e.g., every 3 seconds)
+        delay(3000)
     }
 }
