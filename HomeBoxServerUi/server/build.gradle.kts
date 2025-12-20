@@ -30,6 +30,9 @@ dependencies {
     testImplementation(libs.kotlin.testJunit)
     implementation(libs.ktor.clientCore)
     implementation(libs.ktor.clientCio)
+    implementation(libs.kotlinx.serialization.json)
+    implementation(libs.ktor.clientContentNegociacion)
+    implementation(libs.ktot.serializationJson)
     implementation("ch.qos.logback:logback-classic:1.2.10")
     implementation("org.jsoup:jsoup:1.15.3")
 }

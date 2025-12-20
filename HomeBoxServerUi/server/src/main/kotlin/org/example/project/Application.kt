@@ -38,9 +38,9 @@ fun Application.module() {
 
     val filelistClient = FilelistClient()
 
-   // println(desired)
-   /* val baseCfg = FileManager.configureExistingBase(desired) //todo: enable
-    require(baseCfg.ok) { baseCfg.message }*/
+    // println(desired)
+    /* val baseCfg = FileManager.configureExistingBase(desired) //todo: enable
+     require(baseCfg.ok) { baseCfg.message }*/
 
 
     routing {
@@ -94,10 +94,22 @@ fun Application.module() {
             call.respond(isInstalled)
         }
 
-        post("/downloadFile"){
+        post("/downloadFile") {
             val item = call.receive<DownloadItem>()
             val response =
-                withContext(Dispatchers.IO) { filelistClient.downloadFile(item.itemId)}
+                withContext(Dispatchers.IO) { filelistClient.downloadFile(item.itemId) }
+            call.respond(response)
+        }
+
+        get("/torrentsStatus") {
+            val torrents =
+                withContext(Dispatchers.IO) { QBittorrentUtils.getTorrentsList() }
+            call.respond(torrents)
+        }
+
+        post("/deleteTorrent"){
+            val hash = call.receive<String>()
+            val response = withContext(Dispatchers.IO) { QBittorrentUtils.deleteTorrent(hash) }
             call.respond(response)
         }
     }

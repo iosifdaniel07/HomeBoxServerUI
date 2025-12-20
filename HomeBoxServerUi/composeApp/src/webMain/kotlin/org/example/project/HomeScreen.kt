@@ -35,6 +35,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import homeboxserverui.composeapp.generated.resources.Res
 import homeboxserverui.composeapp.generated.resources.search
@@ -413,7 +414,7 @@ fun Notification(message: String) {
         Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
             Text(
                 message,
-                color = MaterialTheme.colorScheme.primary,
+                color = Color.White,
                 modifier = Modifier.wrapContentWidth()
             )
         }

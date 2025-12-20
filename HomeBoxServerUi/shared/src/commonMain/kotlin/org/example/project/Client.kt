@@ -4,10 +4,10 @@ import io.ktor.client.*
 import io.ktor.client.call.body
 import io.ktor.client.request.*
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
-import io.ktor.client.statement.HttpResponse
 import io.ktor.http.ContentType
 import io.ktor.http.contentType
 import io.ktor.serialization.kotlinx.json.*
+import org.example.project.downloadData.TorrentInfo
 import org.example.project.searchData.FirstSearchResponse
 import org.example.project.searchData.SearchCompleteItem
 import org.example.project.searchData.SearchResponse
@@ -79,10 +79,24 @@ object Client {
     }
 
     suspend fun downloadFile(item: DownloadItem): DownloadStatus {
-        val response: DownloadStatus = client.post("http://${host}:8085/downloadFile"){
+        val response: DownloadStatus = client.post("http://${host}:8085/downloadFile") {
             contentType(ContentType.Application.Json)
             setBody(item)
         }.body()
+        return response
+    }
+
+    suspend fun getTorrentsStatus(): List<TorrentInfo> {
+        val response = client.get("http://${host}:8085/torrentsStatus") {
+        }.body<List<TorrentInfo>>()
+        return response
+    }
+
+    suspend fun deleteTorrent(hash: String): Boolean {
+        val response = client.post("http://${host}:8085/deleteTorrent"){
+            contentType(ContentType.Application.FormUrlEncoded)
+            setBody(hash)
+        }.body<Boolean>()
         return response
     }
 
