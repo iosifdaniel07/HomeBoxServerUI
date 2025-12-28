@@ -15,7 +15,7 @@ fun App() {
     MaterialTheme(
         colorScheme = darkColorScheme()
     ) {
-        var currentScreen by remember { mutableStateOf(Screen.HOME) }
+        var currentScreen by remember { mutableStateOf(Screen.LOGIN) }
         var loggedInUser by remember { mutableStateOf("") }
 
         when (currentScreen) {

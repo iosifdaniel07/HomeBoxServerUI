@@ -74,7 +74,7 @@ fun LoginScreen(onLogin: (String, String) -> Unit) {
                         status = "Logging in…"
                         scope.launch {
                             print("start loggin")
-                            val response = client.login(username, password).isSuccess//getServerStatus()//
+                            val response = client.login(username, password).isSuccess
                             print("end loggin ${response}")
                             if(response){
                                 onLogin(username, password)
