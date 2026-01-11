@@ -16,6 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import org.example.project.downloadData.TorrentInfo
 import org.example.project.downloadData.getTorrentStatusDescription
+import kotlin.math.roundToInt
 
 @Composable
 fun TorrentCard(torrentInfo: TorrentInfo, onClick: (name: String) -> Unit) {
@@ -94,9 +95,9 @@ fun TorrentCard(torrentInfo: TorrentInfo, onClick: (name: String) -> Unit) {
 }
 
 // Helper function to format download speed (e.g., converting bytes to MiB/s)
-fun formatSpeed(speed: Int): String {
-    val speedInMiB = speed / (1024.0 * 1024.0)  // Convert speed to MiB/s
-    return "$speedInMiB MiB/s"  // Using Kotlin string template
+fun formatSpeed(speedBytesPerSec: Int): String {
+    val mibPerSec = (speedBytesPerSec / (1024.0 * 1024.0)).roundToInt()
+    return "$mibPerSec MiB/s"
 }
 
 // Helper function to format ETA time (converting seconds into a readable format)

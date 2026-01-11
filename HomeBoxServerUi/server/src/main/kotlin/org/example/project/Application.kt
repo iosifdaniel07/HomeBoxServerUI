@@ -7,20 +7,58 @@ import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
+import io.ktor.server.auth.Authentication
+import io.ktor.server.auth.UserIdPrincipal
+import io.ktor.server.auth.session
+import io.ktor.server.plugins.calllogging.CallLogging
 import io.ktor.server.plugins.contentnegotiation.*
 import io.ktor.server.plugins.cors.routing.CORS
 import io.ktor.server.request.receive
+import io.ktor.server.sessions.SessionTransportTransformerEncrypt
+import io.ktor.server.sessions.Sessions
+import io.ktor.server.sessions.cookie
+import io.ktor.server.sessions.sessions
+import io.ktor.server.sessions.set
+import io.ktor.util.hex
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import org.example.project.AdminPasswordArgon2.ADMIN_USERNAME
 import org.example.project.searchData.SearchCompleteItem
 import org.example.project.serverData.DeleteItem
 import org.example.project.serverData.DeleteResponse
 import org.example.project.serverData.DownloadItem
+import org.slf4j.event.Level
+import java.nio.file.Path
+import kotlin.system.exitProcess
+import kotlin.time.Duration.Companion.hours
 
-const val desired = "/home/daniel/Desktop/testt"
+const val desired = "/home/daniel/Desktop/testt"//todo...move this in a configurable file
 
 fun main() {
-    embeddedServer(Netty, port = SERVER_PORT, host = "0.0.0.0", module = Application::module)
+    val isProd = (System.getenv(APP_ENV) ?: DEV_ENV).lowercase() == PROD_ENV
+
+    // În PROD, nu expune Ktor direct. Lasă-l local și pune Caddy/Nginx în față.
+    val host = if (isProd) "127.0.0.1" else "0.0.0.0"
+
+    val appName = SERVER_NAME
+    val home = System.getProperty("user.home")
+    val envDir = Path.of(home, ".config", appName)
+    val envFile = envDir.resolve("env")
+
+    val kv = ShellEnvFileKvStore(envFile)
+    kv.ensureDirAndUmaskLikePermissions()
+
+    AdminPasswordArgon2.ensureAdminPassword(object : KvStore {
+        override fun get(key: String): String? =
+            getEnv(key)
+
+        override fun set(key: String, value: String) {
+            kv.set(key, value)
+            exitProcess(0)
+        }
+    })
+
+    embeddedServer(Netty, port = SERVER_PORT, host = host, module = Application::module)
         .start(wait = true)
 }
 
@@ -33,8 +71,39 @@ fun Application.module() {
         allowHeader(HttpHeaders.ContentType)
         allowHeader(HttpHeaders.Authorization)
         allowMethod(HttpMethod.Get)
+        allowCredentials = true
     }
+    install(CallLogging) { level = Level.INFO }
 
+    val encryptKeyHex = requireEnv(SESSION_ENCRYPT_KEY_HEX)
+    val signKeyHex = requireEnv(SESSION_SIGN_KEY_HEX)
+    val isProd = (System.getenv(APP_ENV) ?: DEV_ENV).lowercase() == PROD_ENV
+
+    install(Sessions) {
+        cookie<AdminSession>("admin_session") {
+            cookie.path = "/"
+            cookie.httpOnly = true
+            cookie.secure =
+                isProd   // în dev pe http trebuie false, altfel browserul NU salvează cookie-ul
+            cookie.maxAgeInSeconds = 12.hours.inWholeSeconds
+
+            // SameSite (Ktor: via extensions). :contentReference[oaicite:3]{index=3}
+            cookie.extensions["SameSite"] = if (isProd) "Strict" else "Lax"
+
+            // Semnează + criptează conținutul sesiunii în cookie
+            transform(SessionTransportTransformerEncrypt(hex(encryptKeyHex), hex(signKeyHex)))
+        }
+    }
+    install(Authentication) {
+        session<AdminSession>("admin-session") {
+            validate { sess ->
+                if (sess.user == requireEnv(ADMIN_USERNAME)) UserIdPrincipal(sess.user) else null
+            }
+            challenge {
+                call.respond(HttpStatusCode.Unauthorized, "Login required")
+            }
+        }
+    }
 
     val filelistClient = FilelistClient()
 
@@ -50,6 +119,21 @@ fun Application.module() {
         }
 
         post("/login") {
+            val req = call.receive<LoginRequest>()
+            if (verifyAdminCredentials(req.username, req.password)) {
+                call.sessions.set(
+                    AdminSession(
+                        user = req.username,
+                        issuedAtMillis = System.currentTimeMillis()
+                    )
+                )
+                call.respond(LoginResponse(true))
+            } else {
+                call.respond(LoginResponse(false))
+            }
+        }
+
+        post("/loginFileList") {
             val loginRequest = call.receive<LoginRequest>()
 
             // First, attempt login
@@ -107,10 +191,23 @@ fun Application.module() {
             call.respond(torrents)
         }
 
-        post("/deleteTorrent"){
+        post("/deleteTorrent") {
             val hash = call.receive<String>()
             val response = withContext(Dispatchers.IO) { QBittorrentUtils.deleteTorrent(hash) }
             call.respond(response)
         }
     }
 }
+
+private fun verifyAdminCredentials(username: String, password: String): Boolean {
+    val expectedUser = requireEnv(AdminPasswordArgon2.ADMIN_USERNAME)
+    val expectedHash = requireEnv(AdminPasswordArgon2.KEY)
+
+    if (username != expectedUser) return false
+    return AdminPasswordArgon2.verifyPassword(expectedHash, password.toCharArray())
+}
+
+private fun requireEnv(name: String): String = System.getenv(name)
+    ?: error("Missing env var: $name")
+
+private fun getEnv(name: String): String? = System.getenv(name)

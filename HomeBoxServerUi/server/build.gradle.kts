@@ -1,3 +1,23 @@
+import org.gradle.api.tasks.Sync
+
+tasks.named<Sync>("installDist") {
+    from("setup-server-env.ssh") {
+        into("bin")
+        // 0755
+        fileMode = Integer.parseInt("755", 8)
+    }
+    from("command_config") {
+        into("bin")
+        // 0755
+        fileMode = Integer.parseInt("755", 8)
+    }
+    from("setup-caddy-local.ssh") {
+        into("bin")
+        // 0755
+        fileMode = Integer.parseInt("755", 8)
+    }
+}
+
 plugins {
     alias(libs.plugins.kotlinJvm)
     alias(libs.plugins.ktor)
@@ -35,4 +55,8 @@ dependencies {
     implementation(libs.ktot.serializationJson)
     implementation("ch.qos.logback:logback-classic:1.2.10")
     implementation("org.jsoup:jsoup:1.15.3")
+    implementation("io.ktor:ktor-server-auth-jvm:3.3.0")
+    implementation("io.ktor:ktor-server-sessions-jvm:3.3.0")
+    implementation("io.ktor:ktor-server-call-logging-jvm:3.3.0")
+    implementation("de.mkammerer:argon2-jvm:2.11")
 }

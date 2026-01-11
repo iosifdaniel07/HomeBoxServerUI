@@ -1,0 +1,12 @@
+chmod +x setup-server-env.ssh && ./setup-server-env.ssh
+
+nl -ba ~/.config/myserver/env
+
+rm ~/.config/myserver/env
+APP_ENV=dev or prod
+
+sudo nano /etc/hosts
+127.0.0.1 homestreambox.local
+curl -vk https://homestreambox.local
+
+sudo apt install argon2

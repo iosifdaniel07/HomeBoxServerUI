@@ -1,0 +1,122 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+APP_NAME="myserver"
+ENV_DIR="$HOME/.config/$APP_NAME"
+ENV_FILE="$ENV_DIR/env"
+
+mkdir -p "$ENV_DIR"
+umask 077
+
+need() { command -v "$1" >/dev/null 2>&1 || { echo "Missing: $1"; exit 1; }; }
+need openssl
+
+gen_hex() { openssl rand -hex 16; } # 16 bytes => 32 hex chars
+
+# Escape single quotes for safe single-quoted shell values
+quote() {
+  local s="$1"
+  printf "'%s'" "${s//\'/\'\"\'\"\'}"
+}
+
+get_kv() {
+  local k="$1"
+  [[ -f "$ENV_FILE" ]] || { echo ""; return; }
+  sed -nE "s/^${k}='(.*)'$/\1/p" "$ENV_FILE" | tail -n 1
+}
+
+set_kv() {
+  local k="$1" v="$2" qv
+  qv="$(quote "$v")"
+
+  if [[ -f "$ENV_FILE" ]] && grep -qE "^${k}=" "$ENV_FILE"; then
+    perl -0777 -i -pe "s|^${k}=.*$|${k}=${qv}|m" "$ENV_FILE"
+  else
+    echo "${k}=${qv}" >> "$ENV_FILE"
+  fi
+}
+
+prompt() {
+  local label="$1" def="$2"
+  local v
+  read -r -p "$label [$def]: " v
+  echo "${v:-$def}"
+}
+
+prompt_secret() {
+  local label="$1" v
+  read -r -s -p "$label: " v
+  echo
+  printf "%s" "$v"
+}
+
+echo "== $APP_NAME setup =="
+
+enc="$(get_kv SESSION_ENCRYPT_KEY_HEX)"
+if [[ -z "$enc" ]]; then
+  enc="$(gen_hex)"
+  set_kv SESSION_ENCRYPT_KEY_HEX "$enc"
+  echo "Generated SESSION_ENCRYPT_KEY_HEX"
+fi
+
+sig="$(get_kv SESSION_SIGN_KEY_HEX)"
+if [[ -z "$sig" ]]; then
+  sig="$(gen_hex)"
+  set_kv SESSION_SIGN_KEY_HEX "$sig"
+  echo "Generated SESSION_SIGN_KEY_HEX"
+fi
+
+admin_user="$(get_kv ADMIN_USERNAME)"
+if [[ -z "$admin_user" ]]; then
+  admin_user="$(prompt "ADMIN_USERNAME" "admin")"
+  set_kv ADMIN_USERNAME "$admin_user"
+fi
+
+app_env="$(get_kv APP_ENV)"
+if [[ -z "$app_env" ]]; then
+  app_env="$(prompt "APP_ENV (dev/prod)" "dev")"
+  set_kv APP_ENV "$app_env"
+fi
+
+chmod 600 "$ENV_FILE" 2>/dev/null || true
+
+# Auto-load env in future shells
+if [[ -n "${SHELL:-}" ]] && [[ "${SHELL##*/}" == "zsh" ]]; then
+  RC="$HOME/.zshrc"
+else
+  RC="$HOME/.bashrc"
+fi
+
+LINE="source \"$ENV_FILE\""
+grep -Fxq "$LINE" "$RC" 2>/dev/null || echo "$LINE" >> "$RC"
+
+echo "Saved env to: $ENV_FILE"
+echo "Added auto-load to: $RC"
+
+# Load now and run server
+set -a
+# shellcheck disable=SC1090
+source "$ENV_FILE"
+set +a
+
+while true; do
+  echo "Starting ./server ..."
+  ./server
+  code=$?
+  if [[ $code -eq 0 ]]; then
+    echo "Server requested restart (exit 0). Reloading env and restarting..."
+
+    if [[ -f "$ENV_FILE" ]]; then
+      set -a
+      source "$ENV_FILE"
+      set +a
+    else
+      echo "ENV_FILE not found: $ENV_FILE" >&2
+    fi
+
+    continue
+  fi
+
+  echo "Server exited with code $code. Stopping."
+  exit "$code"
+done

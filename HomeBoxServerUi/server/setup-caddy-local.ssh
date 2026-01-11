@@ -1,0 +1,166 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+DOMAIN="${DOMAIN:-}"
+UPSTREAM="${UPSTREAM:-127.0.0.1:8085}"
+
+need() { command -v "$1" >/dev/null 2>&1 || { echo "Missing: $1"; exit 1; }; }
+
+# Cere obligatoriu domeniul dacă nu e setat în ENV
+if [[ -z "$DOMAIN" ]]; then
+  read -r -p "Domain name (required): " DOMAIN
+fi
+
+# Dacă e gol, ieșim
+if [[ -z "$DOMAIN" ]]; then
+  echo "Error: DOMAIN is required."
+  exit 1
+fi
+
+# (opțional) validare simplă: fără spații
+if [[ "$DOMAIN" =~ [[:space:]] ]]; then
+  echo "Error: invalid domain (contains spaces)."
+  exit 1
+fi
+
+if [[ "${EUID:-$(id -u)}" -ne 0 ]]; then
+  echo "Run as root: sudo $0"
+  exit 1
+fi
+
+echo "== Caddy local HTTPS setup =="
+echo "DOMAIN   : $DOMAIN"
+echo "UPSTREAM : $UPSTREAM"
+echo
+
+install_caddy_apt() {
+  need apt
+  apt update
+  apt install -y debian-keyring debian-archive-keyring apt-transport-https curl gpg
+  curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' \
+    | gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+  curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' \
+    | tee /etc/apt/sources.list.d/caddy-stable.list >/dev/null
+  apt update
+  apt install -y caddy
+}
+
+install_caddy_dnf() {
+  need dnf
+  dnf install -y 'dnf-command(config-manager)' curl
+  dnf config-manager --add-repo https://dl.cloudsmith.io/public/caddy/stable/rpm.repo
+  dnf install -y caddy
+}
+
+install_caddy_pacman() {
+  need pacman
+  pacman -Sy --noconfirm caddy
+}
+
+if command -v caddy >/dev/null 2>&1; then
+  echo "[OK] Caddy already installed: $(caddy version)"
+else
+  echo "[..] Installing Caddy..."
+  if command -v apt >/dev/null 2>&1; then
+    install_caddy_apt
+  elif command -v dnf >/dev/null 2>&1; then
+    install_caddy_dnf
+  elif command -v pacman >/dev/null 2>&1; then
+    install_caddy_pacman
+  else
+    echo "Unsupported distro: no apt/dnf/pacman found."
+    exit 1
+  fi
+  echo "[OK] Installed: $(caddy version)"
+fi
+
+# Stop anything else on 80/443
+echo
+echo "[..] Checking ports 80/443..."
+if ss -ltnp 2>/dev/null | egrep -q ':80|:443'; then
+  echo "[!!] Ports 80/443 are in use. Attempting to stop common web servers..."
+  systemctl stop nginx 2>/dev/null || true
+  systemctl stop apache2 2>/dev/null || true
+  systemctl stop httpd 2>/dev/null || true
+fi
+echo "[OK] Ports 80/443 are free."
+
+# Backup existing Caddyfile
+CADDYFILE="/etc/caddy/Caddyfile"
+if [[ -f "$CADDYFILE" ]]; then
+  cp -a "$CADDYFILE" "${CADDYFILE}.bak.$(date +%s)" || true
+fi
+
+echo
+echo "[..] Writing $CADDYFILE ..."
+cat > "$CADDYFILE" <<EOF
+$DOMAIN {
+  tls internal
+  reverse_proxy $UPSTREAM
+}
+EOF
+
+echo "[..] Validating Caddyfile ..."
+caddy validate --config "$CADDYFILE" --adapter caddyfile
+
+echo
+echo "[..] Enabling + restarting Caddy service ..."
+systemctl enable --now caddy
+systemctl restart caddy
+systemctl --no-pager --full status caddy | sed -n '1,20p' || true
+
+echo
+echo "[..] Installing (trusting) Caddy local CA on this VM ..."
+# In some distros, `caddy trust` needs to run as root.
+caddy trust || true
+
+# Firewall openings (best effort)
+echo
+if command -v ufw >/dev/null 2>&1; then
+  echo "[..] UFW detected: allowing 80/tcp and 443/tcp ..."
+  ufw allow 80/tcp || true
+  ufw allow 443/tcp || true
+  ufw status || true
+elif command -v firewall-cmd >/dev/null 2>&1; then
+  echo "[..] firewalld detected: allowing http/https ..."
+  firewall-cmd --permanent --add-service=http || true
+  firewall-cmd --permanent --add-service=https || true
+  firewall-cmd --reload || true
+  firewall-cmd --list-services || true
+else
+  echo "[..] No ufw/firewalld detected. Skipping firewall configuration."
+fi
+
+echo
+echo "== Next steps on your PC (host) =="
+
+# Try to discover VM IP
+VM_IP="$(ip -4 addr show | awk '/inet / && $2 !~ /^127\./ {gsub(/\/.*/,"",$2); print $2; exit}')"
+if [[ -n "${VM_IP:-}" ]]; then
+  echo "1) Add this to your PC hosts file:"
+  echo "   $VM_IP $DOMAIN"
+else
+  echo "1) Find VM IP (run in VM: ip a) then add to your PC hosts file:"
+  echo "   <VM_IP> $DOMAIN"
+fi
+
+echo
+echo "2) Copy the Caddy root CA cert from this VM to your PC and import it as Trusted Root."
+echo "   Finding root.crt paths (one of these will exist):"
+
+ROOTS="$(find /var/lib/caddy /home -maxdepth 8 -type f \( -name 'root.crt' -o -name 'rootCA.pem' -o -name '*root*.crt' \) 2>/dev/null | head -n 10 || true)"
+if [[ -n "$ROOTS" ]]; then
+  echo "$ROOTS" | sed 's/^/   - /'
+else
+  echo "   (Could not auto-find. Common path is under /var/lib/caddy/.local/share/caddy/pki/authorities/local/root.crt)"
+fi
+
+echo
+echo "3) Test from PC browser:"
+echo "   https://$DOMAIN"
+echo
+echo "== Notes =="
+echo "- Make sure your Ktor server listens on 127.0.0.1:8085 inside the VM."
+echo "- For login sessions over HTTPS, set cookie.secure=true in your Ktor config (or COOKIE_SECURE=true env)."
+echo
+echo "[OK] Done."
