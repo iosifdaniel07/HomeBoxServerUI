@@ -13,7 +13,8 @@ import org.example.project.searchData.SearchFiltersData
 import org.example.project.searchData.SearchResponse
 import org.example.project.serverData.DownloadStatus
 import org.jsoup.Jsoup
-import java.io.File
+import java.nio.file.Files
+import java.nio.file.Path
 
 /**
  * HTTP client for filelist.io login
@@ -108,7 +109,6 @@ class FilelistClient {
      * @return true if login was successful, false otherwise
      */
     suspend fun login(username: String, password: String): Boolean {
-        println("Username: ${username}")
         return try {
             val validatorValue = getValidator(client)
             cachedValidator = validatorValue
@@ -161,15 +161,16 @@ class FilelistClient {
         if (fileName == null) {
             return DownloadStatus(false, error = "No filename in header")
         }
-        val home = System.getProperty("user.home")
-        val downloadsDir = File(home, "TorrentsDownloads")
-        if (!downloadsDir.exists()) {
+        //val home = System.getProperty("user.home")
+        //val downloadsDir = File(home, "TorrentsDownloads")
+        /*if (!downloadDir.exists()) {
             downloadsDir.mkdirs()
-        }
+        }*/
 
-        val outFile = File(downloadsDir, fileName)
-        outFile.writeBytes(bytes)
-        println("Saved to: ${outFile.absolutePath}")
+        val downloadsDir: Path = FileManager.baseDir()
+        val outPath: Path = downloadsDir.resolve(fileName)
+        Files.write(outPath, bytes)
+        println("Saved to: ${outPath}")
 
         val added = QBittorrentUtils.addTorrentFile(
             bytes = bytes,
@@ -188,6 +189,8 @@ class FilelistClient {
 
     suspend fun firstSearch(): FirstSearchResponse {
         try {
+            val settings = SettingsEncriptor.readSettingsFromFile()
+            login(settings.filelistUsername, settings.filelistPassword)
             val response = client.get("https://filelist.io/browse.php") {
                 browseHeaders()
             }

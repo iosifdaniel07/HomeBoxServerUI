@@ -48,10 +48,11 @@ object QBittorrentUtils {
     }
 
     suspend fun loginToQbittorrent(
-        baseUrl: String = BASE_URL,
-        username: String = "admin",
-        password: String = "admin07"
+        baseUrl: String = BASE_URL
     ): Boolean {
+        val settings = SettingsEncriptor.readSettingsFromFile()
+        val username: String = settings.qbUsername
+        val password: String = settings.qbPassword
         client.post(baseUrl)
         val response: HttpResponse = client.post("$baseUrl/api/v2/auth/login") {
             contentType(ContentType.Application.FormUrlEncoded)

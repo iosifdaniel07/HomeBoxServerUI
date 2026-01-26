@@ -17,7 +17,6 @@ import org.jsoup.nodes.Element
 import org.jsoup.select.Elements
 
 
-// PHPSESSID=apmbbir6uuvbhpol2lpiliteu8; uid=1411920; pass=d8db42735ab25cb809ab5b9ef6b07b11
 suspend fun extractCookies(client: HttpClient): String {
     val cookies = client.cookies("https://filelist.io/takelogin.php")
     println("cookies: $cookies")

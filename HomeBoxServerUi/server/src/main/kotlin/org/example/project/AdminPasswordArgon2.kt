@@ -1,6 +1,7 @@
 package org.example.project
 import de.mkammerer.argon2.Argon2Factory
 import java.io.Console
+
 interface KvStore {
     fun get(key: String): String?
     fun set(key: String, value: String)

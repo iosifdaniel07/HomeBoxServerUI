@@ -44,6 +44,9 @@ fun TopBar(currentScreen: Screen, onMenuSelected: (screen: Screen) -> Unit) {
             },
             ActionItem("logout", "Logout", screen = Screen.LOGIN) {
                 onMenuSelected(Screen.LOGIN)
+            },
+            ActionItem("serverSettings", Screen.SERVER_SETTINGS.text, screen = Screen.SERVER_SETTINGS){
+                onMenuSelected(Screen.SERVER_SETTINGS)
             }
         )
     }

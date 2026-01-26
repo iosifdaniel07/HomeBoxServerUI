@@ -17,6 +17,7 @@ import org.example.project.serverData.DirListing
 import org.example.project.serverData.DownloadItem
 import org.example.project.serverData.DownloadStatus
 import org.example.project.serverData.FilesystemUsage
+import org.example.project.serverData.ServerSettings
 
 
 // Shared class to handle API calls in common code
@@ -93,11 +94,24 @@ object Client {
     }
 
     suspend fun deleteTorrent(hash: String): Boolean {
-        val response = client.post("http://${host}:8085/deleteTorrent"){
+        val response = client.post("http://${host}:8085/deleteTorrent") {
             contentType(ContentType.Application.FormUrlEncoded)
             setBody(hash)
         }.body<Boolean>()
         return response
+    }
+
+    suspend fun getServerSettins(): ServerSettings {
+        val resposne = client.get("http://${host}:8085//getServerSettings").body<ServerSettings>()
+        return resposne
+    }
+
+    suspend fun saveServerSettings(serverSettings: ServerSettings): Boolean {
+        val resposne = client.post("http://${host}:8085//saveServerSettings") {
+            contentType(ContentType.Application.Json)
+            setBody(serverSettings)
+        }.body<Boolean>()
+        return resposne
     }
 
     // Clean up resources when done

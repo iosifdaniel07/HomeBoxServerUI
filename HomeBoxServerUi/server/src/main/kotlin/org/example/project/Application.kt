@@ -27,12 +27,12 @@ import org.example.project.searchData.SearchCompleteItem
 import org.example.project.serverData.DeleteItem
 import org.example.project.serverData.DeleteResponse
 import org.example.project.serverData.DownloadItem
+import org.example.project.serverData.ServerSettings
 import org.slf4j.event.Level
 import java.nio.file.Path
 import kotlin.system.exitProcess
 import kotlin.time.Duration.Companion.hours
 
-const val desired = "/home/daniel/Desktop/testt"//todo...move this in a configurable file
 
 fun main() {
     val isProd = (System.getenv(APP_ENV) ?: DEV_ENV).lowercase() == PROD_ENV
@@ -95,7 +95,7 @@ fun Application.module() {
         }
     }
     install(Authentication) {
-        session<AdminSession>("admin-session") {
+        session<AdminSession>(ADMIN_SESSION) {
             validate { sess ->
                 if (sess.user == requireEnv(ADMIN_USERNAME)) UserIdPrincipal(sess.user) else null
             }
@@ -106,11 +106,8 @@ fun Application.module() {
     }
 
     val filelistClient = FilelistClient()
-
-    // println(desired)
-    /* val baseCfg = FileManager.configureExistingBase(desired) //todo: enable
-     require(baseCfg.ok) { baseCfg.message }*/
-
+    SettingsEncriptor.createServerSettingsIfNotExist()
+    FileManager.configureExistingBase(SettingsEncriptor.readSettingsFromFile().downloadFolder)
 
     routing {
 
@@ -196,6 +193,18 @@ fun Application.module() {
             val response = withContext(Dispatchers.IO) { QBittorrentUtils.deleteTorrent(hash) }
             call.respond(response)
         }
+
+        get("/getServerSettings") {
+            val response = SettingsEncriptor.readSettingsFromFile()
+            call.respond(response)
+        }
+
+        post("/saveServerSettings") {
+            val settings = call.receive<ServerSettings>()
+            val response =
+                withContext(Dispatchers.IO) { SettingsEncriptor.saveSettingsToFile(settings) }
+            call.respond(response)
+        }
     }
 }
 
@@ -207,7 +216,7 @@ private fun verifyAdminCredentials(username: String, password: String): Boolean 
     return AdminPasswordArgon2.verifyPassword(expectedHash, password.toCharArray())
 }
 
-private fun requireEnv(name: String): String = System.getenv(name)
+fun requireEnv(name: String): String = System.getenv(name)
     ?: error("Missing env var: $name")
 
 private fun getEnv(name: String): String? = System.getenv(name)

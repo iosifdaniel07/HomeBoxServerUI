@@ -7,7 +7,8 @@ enum class Screen(val text: String) {
     LOGIN(""),
     HOME("Search Page"),
     DISK_SPACE("Disk Management"),
-    DOWNLOAD_MANAGEMENT("Download Management")
+    DOWNLOAD_MANAGEMENT("Download Management"),
+    SERVER_SETTINGS("Server Settings")
 }
 
 @Composable
@@ -46,6 +47,11 @@ fun App() {
                 DownloadManagementScreen {
                     currentScreen = it
                 }
+            }
+            Screen.SERVER_SETTINGS -> {
+               ServerSettingsScreen{
+                   currentScreen = it
+               }
             }
         }
     }

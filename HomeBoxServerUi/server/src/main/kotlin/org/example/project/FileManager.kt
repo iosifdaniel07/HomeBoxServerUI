@@ -22,20 +22,29 @@ object FileManager {
     fun configureExistingBase(absOrRelPath: String): OpResult {
         return try {
             val p = Paths.get(absOrRelPath).toAbsolutePath().normalize()
+            println("Path..: $p............................")
 
-            require(p.exists()) { "Base path does not exist: $p" }
+            // Check if path exists, if not, create it
+            if (!p.exists()) {
+                println("Path does not exist, creating directory: $p")
+                Files.createDirectories(p) // Create directory if it doesn't exist
+            }
+
+            // Ensure it's a directory and writable
             require(p.isDirectory()) { "Base path is not a directory: $p" }
             require(Files.isWritable(p)) { "Base path is not writable: $p" }
 
             BASE_DIR_REF.set(p)
+            println("Base configured: $p.....................")
             OpResult(true, "Base configured: $p")
         } catch (e: Exception) {
+            println(e)
             OpResult(false, "Base configuration failed: ${e.message}")
         }
     }
 
     /** Read the configured base dir or throw if not set. */
-    private fun baseDir(): Path {
+    fun baseDir(): Path {
         return BASE_DIR_REF.get()
             ?: throw IllegalStateException("FileManager base not configured. Call configureExistingBase(path) first.")
     }
