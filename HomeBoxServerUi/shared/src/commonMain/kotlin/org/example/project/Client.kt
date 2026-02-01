@@ -28,10 +28,12 @@ object Client {
         }
     }
 
-    val host = "localhost"//"192.168.1.139"//https://example.com....
+    val isProd = true //todo...
+    val port = 8085
+    val host = if (isProd) "https://homestreambox.go.ro/" else "http://localhost${port}" //todo....
 
     suspend fun login(username: String, password: String): LoginResponse {
-        val response: LoginResponse = client.post("http://${host}:8085/login") {
+        val response: LoginResponse = client.post("${host}/login") {
             contentType(ContentType.Application.Json)
             setBody(LoginRequest(username, password))
         }.body()
@@ -40,12 +42,12 @@ object Client {
 
     suspend fun firstSearch(): FirstSearchResponse {
         val response: FirstSearchResponse =
-            client.get("http://${host}:8085/firstSearch").body()
+            client.get("${host}/firstSearch").body()
         return response
     }
 
     suspend fun search(item: SearchCompleteItem): SearchResponse {
-        val response: SearchResponse = client.post("http://${host}:8085/search") {
+        val response: SearchResponse = client.post("${host}/search") {
             contentType(ContentType.Application.Json)
             setBody(item)
         }.body()
@@ -53,19 +55,19 @@ object Client {
     }
 
     suspend fun diskSize(): FilesystemUsage {
-        val response: FilesystemUsage = client.get("http://${host}:8085/diskSpace") {
+        val response: FilesystemUsage = client.get("${host}/diskSpace") {
         }.body()
         return response
     }
 
     suspend fun list(): DirListing {
-        val response: DirListing = client.get("http://${host}:8085/dirData") {
+        val response: DirListing = client.get("${host}/dirData") {
         }.body()
         return response
     }
 
     suspend fun deleteFile(file: DeleteItem): Boolean {
-        val response: DeleteResponse = client.post("http://${host}:8085/deleteFile") {
+        val response: DeleteResponse = client.post("${host}/deleteFile") {
             contentType(ContentType.Application.Json)
             setBody(file)
         }.body()
@@ -74,13 +76,13 @@ object Client {
 
 
     suspend fun qBittorentRunning(): Boolean {
-        val response: Boolean = client.get("http://${host}:8085/qBittorrentRunning") {
+        val response: Boolean = client.get("${host}/qBittorrentRunning") {
         }.body()
         return response
     }
 
     suspend fun downloadFile(item: DownloadItem): DownloadStatus {
-        val response: DownloadStatus = client.post("http://${host}:8085/downloadFile") {
+        val response: DownloadStatus = client.post("${host}/downloadFile") {
             contentType(ContentType.Application.Json)
             setBody(item)
         }.body()
@@ -88,13 +90,13 @@ object Client {
     }
 
     suspend fun getTorrentsStatus(): List<TorrentInfo> {
-        val response = client.get("http://${host}:8085/torrentsStatus") {
+        val response = client.get("${host}/torrentsStatus") {
         }.body<List<TorrentInfo>>()
         return response
     }
 
     suspend fun deleteTorrent(hash: String): Boolean {
-        val response = client.post("http://${host}:8085/deleteTorrent") {
+        val response = client.post("${host}/deleteTorrent") {
             contentType(ContentType.Application.FormUrlEncoded)
             setBody(hash)
         }.body<Boolean>()
@@ -102,12 +104,13 @@ object Client {
     }
 
     suspend fun getServerSettins(): ServerSettings {
-        val resposne = client.get("http://${host}:8085//getServerSettings").body<ServerSettings>()
+        val resposne =
+            client.get("${host}/getServerSettings").body<ServerSettings>()
         return resposne
     }
 
     suspend fun saveServerSettings(serverSettings: ServerSettings): Boolean {
-        val resposne = client.post("http://${host}:8085//saveServerSettings") {
+        val resposne = client.post("${host}/saveServerSettings") {
             contentType(ContentType.Application.Json)
             setBody(serverSettings)
         }.body<Boolean>()

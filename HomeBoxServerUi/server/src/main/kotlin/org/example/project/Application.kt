@@ -39,8 +39,9 @@ fun main() {
 
     // În PROD, nu expune Ktor direct. Lasă-l local și pune Caddy/Nginx în față.
     val host = if (isProd) "127.0.0.1" else "0.0.0.0"
-
+    val serverPort = 8085
     val appName = SERVER_NAME
+
     val home = System.getProperty("user.home")
     val envDir = Path.of(home, ".config", appName)
     val envFile = envDir.resolve("env")
@@ -58,7 +59,7 @@ fun main() {
         }
     })
 
-    embeddedServer(Netty, port = SERVER_PORT, host = host, module = Application::module)
+    embeddedServer(Netty, port = serverPort, host = host, module = Application::module)
         .start(wait = true)
 }
 

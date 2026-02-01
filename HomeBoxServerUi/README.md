@@ -73,6 +73,33 @@ in your IDE's toolbar or run it directly from the terminal:
 
 ---
 
+```shell
+./gradlew :composeApp:jsBrowserDistribution
+```
+
+#Install caddy on server and setup(face redirect la 8085 deja..)
+curl -k https://homestreambox.go.ro/get
+
+
+#start UI
+(run build from compose app -> ![img.png](img.png))
+python3 -m http.server 8090
+
+# setup ufw
+`sudo ufw status
+sudo ufw allow 8090/tcp
+sudo ufw allow 80
+sudo ufw allow 443
+sudo ufw reload`
+
+
+#start server
+curl -k https://homestreambox.go.ro/get
+
+@SFTP
+sftp -P 2222 iosifdaniel07@homestreambox.go.ro
+ssh -p 2222 iosifdaniel07@homestreambox.go.ro
+
 Learn more
 about [Kotlin Multiplatform](https://www.jetbrains.com/help/kotlin-multiplatform-dev/get-started.html),
 [Compose Multiplatform](https://github.com/JetBrains/compose-multiplatform/#compose-multiplatform),

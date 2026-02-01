@@ -1,6 +1,5 @@
 package org.example.project
 
-const val SERVER_PORT = 8085//PORT 80
 const val DEV_ENV = "dev"
 const val PROD_ENV = "prod"
 const val APP_ENV = "APP_ENV"
