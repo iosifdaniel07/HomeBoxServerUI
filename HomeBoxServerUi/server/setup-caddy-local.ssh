@@ -91,11 +91,20 @@ if [[ -f "$CADDYFILE" ]]; then
   cp -a "$CADDYFILE" "${CADDYFILE}.bak.$(date +%s)" || true
 fi
 
-echo
+# Email pentru TLS public
+EMAIL="${EMAIL:-}"
+if [[ -z "$EMAIL" ]]; then
+  read -r -p "Email (required for TLS): " EMAIL
+fi
+if [[ -z "$EMAIL" ]]; then
+  echo "Error: EMAIL is required for TLS certificate."
+  exit 1
+fi
+
 echo "[..] Writing $CADDYFILE ..."
 cat > "$CADDYFILE" <<EOF
 $DOMAIN {
-  tls internal
+  tls $EMAIL
   reverse_proxy $UPSTREAM
 }
 EOF
