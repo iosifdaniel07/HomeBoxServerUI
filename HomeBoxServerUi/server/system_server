@@ -19,3 +19,5 @@ sudo nano /etc/systemd/system/start_server.service
 sudo systemctl daemon-reload
 sudo systemctl enable start_server.service
 sudo systemctl start start_server.service
+# Check the status of the service
+sudo systemctl status start_server.service
