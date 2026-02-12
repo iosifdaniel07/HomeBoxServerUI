@@ -122,6 +122,10 @@ curl -k https://homestreambox.go.ro/api/get
 sftp -P 2222 iosifdaniel07@homestreambox.go.ro
 ssh -p 2222 iosifdaniel07@homestreambox.go.ro
 
+# server script 
+sudo nano /etc/systemd/system/start_server.service
+python3 ~/start_server.py
+
 Learn more
 about [Kotlin Multiplatform](https://www.jetbrains.com/help/kotlin-multiplatform-dev/get-started.html),
 [Compose Multiplatform](https://github.com/JetBrains/compose-multiplatform/#compose-multiplatform),
