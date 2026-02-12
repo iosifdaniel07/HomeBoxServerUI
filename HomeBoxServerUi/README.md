@@ -81,9 +81,33 @@ in your IDE's toolbar or run it directly from the terminal:
 curl -k https://homestreambox.go.ro/get
 
 
-#start UI
+# start UI
 (run build from compose app -> ![img.png](img.png))
-python3 -m http.server 8090
+python3 -m http.server 8086 --bind 127.0.0.1
+
+# Setup ui for caddy...
+# for server
+handle /ui/* {
+reverse_proxy 127.0.0.1:8086
+}
+
+#restart caddy
+sudo caddy validate --config /etc/caddy/Caddyfile
+sudo systemctl restart caddy
+
+# Caddyfile
+homestreambox.go.ro {
+tls iosifdaniel07@yahoo.com
+
+    # Proxy the root domain to port 8085
+    reverse_proxy 127.0.0.1:8085
+
+    handle /ui {
+        uri strip_prefix /ui
+        reverse_proxy 127.0.0.1:8086
+    }
+}
+
 
 # setup ufw
 `sudo ufw status
