@@ -21,3 +21,23 @@ sudo systemctl enable start_server.service
 sudo systemctl start start_server.service
 # Check the status of the service
 sudo systemctl status start_server.service
+
+
+//service/....
+[Unit]
+Description=Start HTTP server and run setup script
+After=network.target
+
+[Service]
+Type=simple
+User=iosifdaniel07
+Group=iosifdaniel07
+UMask=002
+
+ExecStart=/usr/bin/python3 /home/iosifdaniel07/start_server.py
+WorkingDirectory=/home/iosifdaniel07/
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
