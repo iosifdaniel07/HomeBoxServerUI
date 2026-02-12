@@ -112,11 +112,11 @@ fun Application.module() {
 
     routing {
 
-        get("/get") {
+        get("/api/get") {
             call.respondText("Server is running!", ContentType.Text.Plain)
         }
 
-        post("/login") {
+        post("/api/login") {
             val req = call.receive<LoginRequest>()
             if (verifyAdminCredentials(req.username, req.password)) {
                 call.sessions.set(
@@ -131,7 +131,7 @@ fun Application.module() {
             }
         }
 
-        post("/loginFileList") {
+        post("/api/loginFileList") {
             val loginRequest = call.receive<LoginRequest>()
 
             // First, attempt login
@@ -139,13 +139,13 @@ fun Application.module() {
             call.respond(HttpStatusCode.OK, LoginResponse(success))
         }
 
-        get("/firstSearch") {
+        get("/api/firstSearch") {
             println("first search")
             val results = filelistClient.firstSearch()
             call.respond(HttpStatusCode.OK, results)
         }
 
-        post("/search") {
+        post("/api/search") {
             println("search")
             val searchItem = call.receive<SearchCompleteItem>()
             println(searchItem)
@@ -153,54 +153,54 @@ fun Application.module() {
             call.respond(HttpStatusCode.OK, results)
         }
 
-        get("/diskSpace") {
+        get("/api/diskSpace") {
             val usage = withContext(Dispatchers.IO) { getAllDiskUsage() }
             call.respond(usage)
         }
 
-        get("/dirData") {
+        get("/api/dirData") {
             val usage = withContext(Dispatchers.IO) { FileManager.list() }
             call.respond(usage)
         }
 
-        post("/deleteFile") {
+        post("/api/deleteFile") {
             val fileName = call.receive<DeleteItem>()
             println("delete file: ${fileName}")
             val deleted = withContext(Dispatchers.IO) { FileManager.deleteFile(fileName.item) }
             call.respond(DeleteResponse(deleted.ok))
         }
 
-        get("/qBittorrentRunning") {
+        get("/api/qBittorrentRunning") {
             val isInstalled =
                 withContext(Dispatchers.IO) { QBittorrentUtils.isQbittorrentRunning() }
             call.respond(isInstalled)
         }
 
-        post("/downloadFile") {
+        post("/api/downloadFile") {
             val item = call.receive<DownloadItem>()
             val response =
                 withContext(Dispatchers.IO) { filelistClient.downloadFile(item.itemId) }
             call.respond(response)
         }
 
-        get("/torrentsStatus") {
+        get("/api/torrentsStatus") {
             val torrents =
                 withContext(Dispatchers.IO) { QBittorrentUtils.getTorrentsList() }
             call.respond(torrents)
         }
 
-        post("/deleteTorrent") {
+        post("/api/deleteTorrent") {
             val hash = call.receive<String>()
             val response = withContext(Dispatchers.IO) { QBittorrentUtils.deleteTorrent(hash) }
             call.respond(response)
         }
 
-        get("/getServerSettings") {
+        get("/api/getServerSettings") {
             val response = SettingsEncriptor.readSettingsFromFile()
             call.respond(response)
         }
 
-        post("/saveServerSettings") {
+        post("/api/saveServerSettings") {
             val settings = call.receive<ServerSettings>()
             val response =
                 withContext(Dispatchers.IO) { SettingsEncriptor.saveSettingsToFile(settings) }

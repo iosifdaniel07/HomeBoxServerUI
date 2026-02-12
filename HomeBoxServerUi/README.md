@@ -100,14 +100,12 @@ homestreambox.go.ro {
 tls iosifdaniel07@yahoo.com
 
     # Proxy the root domain to port 8085
-    reverse_proxy 127.0.0.1:8085
+    reverse_proxy 127.0.0.1:8087 # UI
 
-    handle /ui {
-        uri strip_prefix /ui
-        reverse_proxy 127.0.0.1:8086
+    handle /api/* {
+        reverse_proxy 127.0.0.1:8085 # Server
     }
 }
-
 
 # setup ufw
 `sudo ufw status
@@ -118,7 +116,7 @@ sudo ufw reload`
 
 
 #start server
-curl -k https://homestreambox.go.ro/get
+curl -k https://homestreambox.go.ro/api/get
 
 @SFTP
 sftp -P 2222 iosifdaniel07@homestreambox.go.ro

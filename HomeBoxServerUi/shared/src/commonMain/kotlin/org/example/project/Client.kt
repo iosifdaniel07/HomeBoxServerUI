@@ -30,8 +30,8 @@ object Client {
 
     val isProd = true //todo...
     val port = 8085
-    val host = if (isProd) "https://homestreambox.go.ro" else "http://localhost${port}" //todo....
-
+    val host = if (isProd) "https://homestreambox.go.ro/api" else "http://localhost${port}" //todo....
+    //Caddy should remove /api prefix, but in dev we need it to avoid conflicts with the server running on the same machine.
     suspend fun login(username: String, password: String): LoginResponse {
         val response: LoginResponse = client.post("${host}/login") {
             contentType(ContentType.Application.Json)
