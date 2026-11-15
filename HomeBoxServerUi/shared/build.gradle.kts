@@ -30,6 +30,11 @@ kotlin {
         jsMain.dependencies {
             implementation(libs.ktor.clientJs)
             implementation(libs.ktor.client.serialization )
+            implementation(libs.kotlinx.browser)
+        }
+
+        wasmJsMain.dependencies {
+            implementation(libs.kotlinx.browser)
         }
 
         jvmMain.dependencies {

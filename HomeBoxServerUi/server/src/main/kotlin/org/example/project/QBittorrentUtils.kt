@@ -6,6 +6,8 @@ import io.ktor.client.plugins.cookies.AcceptAllCookiesStorage
 import io.ktor.client.plugins.cookies.HttpCookies
 import io.ktor.client.request.forms.MultiPartFormDataContent
 import io.ktor.client.request.forms.formData
+import io.ktor.client.request.forms.submitForm
+import io.ktor.http.Parameters
 import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.request.parameter
@@ -22,15 +24,25 @@ import io.ktor.http.isSuccess
 import io.ktor.serialization.kotlinx.json.json
 import org.example.project.downloadData.TorrentInfo
 import java.io.BufferedReader
-import java.io.File
 import java.io.InputStreamReader
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import kotlinx.serialization.json.Json
+import org.slf4j.LoggerFactory
 
 
 object QBittorrentUtils {
 
-    const val BASE_URL = "http://localhost:8080"
+    private val log = LoggerFactory.getLogger(QBittorrentUtils::class.java)
+
+    /**
+     * Local qBittorrent WebUI URL. Overridable via `HOMEBOX_QBITTORRENT_URL`.
+     * Default binds to loopback (127.0.0.1) to make it clear the WebUI must
+     * NOT be exposed to the public internet.
+     */
+    val BASE_URL: String by lazy {
+        System.getenv(HOMEBOX_QBITTORRENT_URL)?.takeIf { it.isNotBlank() }
+            ?: "http://127.0.0.1:8080"
+    }
 
     val json = Json { ignoreUnknownKeys = true }
 
@@ -61,30 +73,42 @@ object QBittorrentUtils {
             header("Referer", baseUrl)
         }
         val responseString = response.bodyAsText()
-        println("is running? $responseString")
         return responseString == "Ok."
     }
 
     suspend fun logout(baseUrl: String = BASE_URL) {
-        println("logout ....")
         val response = client.post("$baseUrl/api/v2/auth/logout")
         if (response.status.isSuccess()) {
-            println("Logout successful.")
+            log.debug("qbittorrent logout ok")
         } else {
-            println("Logout failed with status: ${response.status}")
+            log.warn("qbittorrent logout failed status={}", response.status)
         }
     }
 
-    suspend fun isQbittorrentRunning(): Boolean { //instalati qbittorent.nox-service
-        try {
+    // Cache for the probe result. UI polls this on an interval, but we don't
+    // want to re-login to qBittorrent on every click: that's one process spawn
+    // + one HTTP POST per call. Instead, we cache for 5 seconds.
+    @Volatile
+    private var probeCacheResult: Boolean = false
+    @Volatile
+    private var probeCacheAtMs: Long = 0L
+    private val probeTtlMs = 5_000L
+
+    suspend fun isQbittorrentRunning(): Boolean {
+        val now = System.currentTimeMillis()
+        if (now - probeCacheAtMs < probeTtlMs) return probeCacheResult
+        val result = try {
             val process = ProcessBuilder("which", "qbittorrent-nox").start()
-            val reader = BufferedReader(InputStreamReader(process.inputStream)).readLine()
-            println("reader ${reader}")
+            val binary = BufferedReader(InputStreamReader(process.inputStream)).readLine()
             val loginResponse = loginToQbittorrent()
-            return reader != null && loginResponse
+            binary != null && loginResponse
         } catch (e: Exception) {
-            return false
+            log.debug("qbittorrent probe failed: {}", e.javaClass.simpleName)
+            false
         }
+        probeCacheResult = result
+        probeCacheAtMs = System.currentTimeMillis()
+        return result
     }
 
     /**
@@ -102,17 +126,14 @@ object QBittorrentUtils {
         category: String? = null,
         paused: Boolean = false
     ): Boolean {
-        val home = System.getProperty("user.home")
-        val downloadsDir = File(home, "Downloads")
-        if (!downloadsDir.exists()) {
-            downloadsDir.mkdirs()
-        }
+        // Save inside the operator-configured base dir, same as where the
+        // torrent file itself is written. No more hidden $HOME/Downloads path.
+        val savePath = FileManager.baseDir().toString()
         loginToQbittorrent()
         val response = client.post("$BASE_URL/api/v2/torrents/add") {
             setBody(
                 MultiPartFormDataContent(
                     formData {
-                        // The important part: the "torrents" field with file bytes
                         append(
                             key = "torrents",
                             value = bytes,
@@ -127,7 +148,7 @@ object QBittorrentUtils {
                                 )
                             }
                         )
-                        append("savepath", downloadsDir.absolutePath)
+                        append("savepath", savePath)
 
                         category?.let {
                             append("category", it)
@@ -170,8 +191,6 @@ object QBittorrentUtils {
             hashes?.let { parameter("hashes", it) }
         }.bodyAsText()
 
-        println(response)
-
         return json.decodeFromString(response)
     }
 
@@ -179,21 +198,19 @@ object QBittorrentUtils {
         hash: String,
         deleteFile: Boolean = false
     ): Boolean {
-
-        val response = client.post("$BASE_URL/api/v2/torrents/delete") {
-
-            // REQUIRED
+        require(hash.matches(Regex("^[A-Fa-f0-9]{40}\$|^[A-Fa-f0-9]{64}\$"))) {
+            "invalid torrent hash"
+        }
+        val response = client.submitForm(
+            url = "$BASE_URL/api/v2/torrents/delete",
+            formParameters = Parameters.build {
+                append("hashes", hash)
+                append("deleteFiles", deleteFile.toString())
+            }
+        ) {
             header(HttpHeaders.Origin, BASE_URL)
             header(HttpHeaders.Referrer, "$BASE_URL/")
-
-            contentType(ContentType.Application.FormUrlEncoded)
-
-            setBody(
-                "hashes=$hash&deleteFiles=$deleteFile"
-            )
         }
-
-        println(response.status)
         return response.status == HttpStatusCode.OK
     }
 }

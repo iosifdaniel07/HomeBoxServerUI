@@ -19,7 +19,6 @@ import org.jsoup.select.Elements
 
 suspend fun extractCookies(client: HttpClient): String {
     val cookies = client.cookies("https://filelist.io/takelogin.php")
-    println("cookies: $cookies")
     val PHPSESSID = cookies.find { it.name == "PHPSESSID" }?.value
     val uid = cookies.find { it.name == "uid" }?.value
     val pass = cookies.find { it.name == "pass" }?.value
@@ -61,15 +60,9 @@ suspend fun getValidator(client: HttpClient): String? {
         val html = response.bodyAsText()
         val document = Jsoup.parse(html)
 
-        // Extract the validator field (assuming it is present in a hidden input field with the name 'validator')
         val validator = document.select("input[name=validator]").attr("value")
-
-        // Log and return the extracted validator
-        println("Validator: $validator")
-
         validator.takeIf { it.isNotEmpty() }
     } catch (e: Exception) {
-        println("Error fetching the page or extracting validator: ${e.message}")
         null
     }
 }
@@ -126,7 +119,6 @@ fun extractSelectOptions(document: Document): SearchFiltersData {
         }
     }
     val pager = extractPageNumbers(document)
-    println("pager: $pager")
     return SearchFiltersData(
         true,
         categories,

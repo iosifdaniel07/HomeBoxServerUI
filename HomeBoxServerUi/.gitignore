@@ -17,3 +17,14 @@ captures
 !*.xcworkspace/contents.xcworkspacedata
 **/xcshareddata/WorkspaceSettings.xcsettings
 node_modules/
+
+# Secrets / operator data — must never be committed
+server_settings.json
+**/server_settings.json
+.env
+*.env
+**/env
+*.pem
+*.key
+*.p12
+*.jks

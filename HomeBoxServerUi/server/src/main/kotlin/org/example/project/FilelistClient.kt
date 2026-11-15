@@ -13,6 +13,7 @@ import org.example.project.searchData.SearchFiltersData
 import org.example.project.searchData.SearchResponse
 import org.example.project.serverData.DownloadStatus
 import org.jsoup.Jsoup
+import org.slf4j.LoggerFactory
 import java.nio.file.Files
 import java.nio.file.Path
 
@@ -20,6 +21,8 @@ import java.nio.file.Path
  * HTTP client for filelist.io login
  */
 class FilelistClient {
+    private val log = LoggerFactory.getLogger(FilelistClient::class.java)
+
     private val client = HttpClient {
         install(HttpCookies) {
             // Automatically handles cookies including session IDs
@@ -119,29 +122,25 @@ class FilelistClient {
                 setBody(FormDataContent(loginForm(validatorValue, username, password)))
             }
 
-            println("Status: ${response.status}")
-            println("Headers: ${response.headers}")
-            println("Body: ${response.bodyAsText()}")
+            // NEVER log response.bodyAsText() / headers / cookies — contain
+            // session cookies and credentials.
+            log.debug("filelist login attempt status={}", response.status)
 
             cookiesHeader = extractCookies(client)
-            println("heree cookies: $cookiesHeader")
 
             if (response.bodyAsText().contains("Invalid login attempt!!")) {
-                println("Login failed: Invalid credentials")
+                log.info("filelist login invalid credentials")
                 return false
             }
 
-            println("Here status: ${response.status}")
             response.status == HttpStatusCode.Found
         } catch (e: Exception) {
-            println("Login error: ${e.message}")
-            e.printStackTrace()
+            log.error("filelist login error: {}", e.javaClass.simpleName)
             false
         }
     }
 
     suspend fun downloadFile(itemId: String): DownloadStatus {
-        println("donwload item: $itemId")
         val response = client.post("https://filelist.io/download.php?id=${itemId}") {
             browseHeaders()
         }
@@ -170,7 +169,7 @@ class FilelistClient {
         val downloadsDir: Path = FileManager.baseDir()
         val outPath: Path = downloadsDir.resolve(fileName)
         Files.write(outPath, bytes)
-        println("Saved to: ${outPath}")
+        log.debug("torrent file saved")
 
         val added = QBittorrentUtils.addTorrentFile(
             bytes = bytes,
@@ -194,9 +193,7 @@ class FilelistClient {
             val response = client.get("https://filelist.io/browse.php") {
                 browseHeaders()
             }
-            println("cookie header " + cookiesHeader)
-            println("status" + response.status)
-            println("headers:..." + response.headers)
+            log.debug("filelist firstSearch status={}", response.status)
             val document = Jsoup.parse(response.bodyAsText())
             val searchItems = extractTorrentClasses(document)
             return FirstSearchResponse(extractSelectOptions(document), searchItems)
@@ -222,12 +219,10 @@ class FilelistClient {
             val response = client.get(createSearchUrl(searchItem)) {
                 browseHeaders()
             }
-            println("status" + response.status)
-            println("headers:..." + response.headers)
+            log.debug("filelist search status={}", response.status)
             val document = Jsoup.parse(response.bodyAsText())
             val searchItems = extractTorrentClasses(document)
             val pager = extractPageNumbers(document)
-            println("pager: $pager")
             return SearchResponse(true, searchItems, pager)
         } catch (e: Exception) {
             return SearchResponse(false, listOf(), Pair(1, 1))

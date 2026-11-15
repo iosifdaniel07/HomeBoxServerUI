@@ -1,12 +1,37 @@
 <configuration>
+
+    <!--
+        Logging configuration for the HomeBox backend.
+
+        Design:
+         - STDOUT: short human-readable lines for `journalctl -u homebox -f`.
+         - AUDIT:  not configured here — the audit log is written directly by
+                   org.example.project.AuditLog as JSON lines to its own file
+                   (see HOMEBOX_AUDIT_LOG). Keeping it outside logback means
+                   accidental logger re-configuration can't disable audit.
+         - Root level INFO (not trace / debug) to avoid leaking request bodies
+           and headers from Ktor internals when run in production.
+         - io.ktor.* explicitly pinned to INFO so verbose debug levels don't
+           dump request data if someone bumps the root level during triage.
+    -->
+
     <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
         <encoder>
-            <pattern>%d{YYYY-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%thread] %logger{36} - %msg%n</pattern>
         </encoder>
     </appender>
-    <root level="trace">
+
+    <root level="INFO">
         <appender-ref ref="STDOUT"/>
     </root>
-    <logger name="org.eclipse.jetty" level="INFO"/>
-    <logger name="io.netty" level="INFO"/>
+
+    <!-- Noisy framework loggers that can leak sensitive data at DEBUG -->
+    <logger name="io.ktor" level="INFO"/>
+    <logger name="io.netty" level="WARN"/>
+    <logger name="org.eclipse.jetty" level="WARN"/>
+    <logger name="io.ktor.client" level="INFO"/>
+
+    <!-- Our own loggers: keep at INFO. Flip to DEBUG only for local development. -->
+    <logger name="org.example.project" level="INFO"/>
+
 </configuration>

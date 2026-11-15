@@ -5,3 +5,5 @@ class JsPlatform: Platform {
 }
 
 actual fun getPlatform(): Platform = JsPlatform()
+
+actual fun apiBaseUrl(): String = "${kotlinx.browser.window.location.origin}/api"

@@ -14,15 +14,13 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import kotlinx.coroutines.launch
-import org.example.project.serverData.ServerSettings
+import org.example.project.serverData.ServerSettingsClient
 
 @Composable
 fun ServerSettingsScreen(
     onMenuSelected: (screen: Screen) -> Unit
 ) {
-    var settingsData by remember { mutableStateOf<ServerSettings?>(null) }
-
-    var downloadFolder by rememberSaveable { mutableStateOf(settingsData?.downloadFolder) }
+    var settingsData by remember { mutableStateOf<ServerSettingsClient?>(null) }
 
     var filelistUser by rememberSaveable { mutableStateOf(settingsData?.filelistUsername) }
     var filelistPass by rememberSaveable { mutableStateOf(settingsData?.filelistPassword) }
@@ -38,7 +36,6 @@ fun ServerSettingsScreen(
 
     LaunchedEffect(Unit) {
         settingsData = client.getServerSettins()
-        downloadFolder = settingsData?.downloadFolder
         filelistUser = settingsData?.filelistUsername
         filelistPass = settingsData?.filelistPassword
         qbUser = settingsData?.qbUsername
@@ -58,16 +55,9 @@ fun ServerSettingsScreen(
                 item { TopBar(Screen.SERVER_SETTINGS, onMenuSelected) }
 
                 item {
-                    Text("Paths", style = MaterialTheme.typography.titleMedium)
-                }
-
-                item(key = downloadFolder) {
-                    OutlinedTextField(
-                        value = downloadFolder ?: "",
-                        onValueChange = { downloadFolder = it },
-                        label = { Text("Download folder") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
+                    Text(
+                        "Download folder is configured by the server operator via the HOMEBOX_DOWNLOAD_FOLDER environment variable.",
+                        style = MaterialTheme.typography.bodySmall
                     )
                 }
 
@@ -134,18 +124,11 @@ fun ServerSettingsScreen(
                             enabled = !saving,
                             onClick = {
                                 error = null
-
-                                // Validări minimale (le ajustezi cum vrei)
-                                if (downloadFolder?.isBlank() ?: true) {
-                                    error = "Download folder is required."; return@Button
-                                }
-
                                 saving = true
                                 try {
                                     scope.launch {
                                         client.saveServerSettings(
-                                            ServerSettings(
-                                                downloadFolder = downloadFolder?.trim().orEmpty(),
+                                            ServerSettingsClient(
                                                 filelistUsername = filelistUser?.trim().orEmpty(),
                                                 filelistPassword = filelistPass.orEmpty(),
                                                 qbUsername = qbUser?.trim().orEmpty(),

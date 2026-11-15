@@ -9,14 +9,29 @@ import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.auth.Authentication
 import io.ktor.server.auth.UserIdPrincipal
+import io.ktor.server.auth.authenticate
+import io.ktor.server.auth.principal
 import io.ktor.server.auth.session
 import io.ktor.server.plugins.calllogging.CallLogging
 import io.ktor.server.plugins.contentnegotiation.*
 import io.ktor.server.plugins.cors.routing.CORS
+import io.ktor.server.plugins.ratelimit.RateLimit
+import io.ktor.server.plugins.ratelimit.RateLimitName
+import io.ktor.server.plugins.ratelimit.rateLimit
+import io.ktor.server.plugins.requestvalidation.RequestValidation
+import io.ktor.server.plugins.requestvalidation.RequestValidationException
+import io.ktor.server.plugins.requestvalidation.ValidationResult
+import io.ktor.server.plugins.statuspages.StatusPages
+import io.ktor.server.request.header
+import io.ktor.server.request.httpMethod
+import io.ktor.server.request.path
 import io.ktor.server.request.receive
+import kotlinx.serialization.Serializable
 import io.ktor.server.sessions.SessionTransportTransformerEncrypt
 import io.ktor.server.sessions.Sessions
+import io.ktor.server.sessions.clear
 import io.ktor.server.sessions.cookie
+import io.ktor.server.sessions.get
 import io.ktor.server.sessions.sessions
 import io.ktor.server.sessions.set
 import io.ktor.util.hex
@@ -28,18 +43,33 @@ import org.example.project.serverData.DeleteItem
 import org.example.project.serverData.DeleteResponse
 import org.example.project.serverData.DownloadItem
 import org.example.project.serverData.ServerSettings
+import org.example.project.serverData.ServerSettingsClient
 import org.slf4j.event.Level
 import java.nio.file.Path
+import java.util.UUID
 import kotlin.system.exitProcess
 import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.minutes
 
 
 fun main() {
     val isProd = (System.getenv(APP_ENV) ?: DEV_ENV).lowercase() == PROD_ENV
 
-    // În PROD, nu expune Ktor direct. Lasă-l local și pune Caddy/Nginx în față.
-    val host = if (isProd) "127.0.0.1" else "0.0.0.0"
-    val serverPort = 8085
+    // In prod, never bind on all interfaces; put Caddy/Nginx in front on 443.
+    val defaultHost = if (isProd) "127.0.0.1" else "0.0.0.0"
+    val host = System.getenv(HOMEBOX_HOST)?.takeIf { it.isNotBlank() } ?: defaultHost
+    val serverPort = System.getenv(HOMEBOX_PORT)?.toIntOrNull()
+        ?.takeIf { it in 1..65535 }
+        ?: 8085
+
+    if (!isProd) {
+        System.err.println(
+            "WARN: $APP_ENV is not '$PROD_ENV'. Session cookies are not Secure, " +
+                    "SameSite is Lax, and the server may bind to 0.0.0.0. " +
+                    "Do NOT run like this on the public internet."
+        )
+    }
+
     val appName = SERVER_NAME
 
     val home = System.getProperty("user.home")
@@ -64,41 +94,146 @@ fun main() {
 }
 
 fun Application.module() {
+    val isProd = (System.getenv(APP_ENV) ?: DEV_ENV).lowercase() == PROD_ENV
+
+    // Defence-in-depth body-size check. Caddy should already reject large
+    // bodies (request_body / max_size), but we refuse at the app layer too
+    // in case someone bypasses the proxy during local operation.
+    val maxBodyBytes = 2L * 1024 * 1024 // 2 MB
+    intercept(ApplicationCallPipeline.Plugins) {
+        val contentLength = call.request.header(HttpHeaders.ContentLength)?.toLongOrNull()
+        if (contentLength != null && contentLength > maxBodyBytes) {
+            call.respond(HttpStatusCode.PayloadTooLarge)
+            finish()
+        }
+    }
+
     install(ContentNegotiation) {
         json()
     }
     install(CORS) {
-        anyHost() // Allows any origin. Adjust this in production.
+        if (isProd) {
+            allowHost("homestreambox.go.ro", schemes = listOf("https"))
+        } else {
+            // Dev: allow the Compose/Kotlin dev servers on localhost.
+            allowHost("localhost:8086", schemes = listOf("http"))
+            allowHost("localhost:8087", schemes = listOf("http"))
+            allowHost("127.0.0.1:8086", schemes = listOf("http"))
+            allowHost("127.0.0.1:8087", schemes = listOf("http"))
+        }
         allowHeader(HttpHeaders.ContentType)
         allowHeader(HttpHeaders.Authorization)
+        allowHeader("X-CSRF-Token")
         allowMethod(HttpMethod.Get)
+        allowMethod(HttpMethod.Post)
+        allowMethod(HttpMethod.Delete)
         allowCredentials = true
     }
-    install(CallLogging) { level = Level.INFO }
+    install(CallLogging) {
+        level = Level.INFO
+        // Don't log login / settings paths — bodies may contain credentials.
+        filter { call ->
+            val path = call.request.path()
+            !path.startsWith("/api/login") &&
+                !path.startsWith("/api/saveServerSettings")
+        }
+    }
+
+    install(RateLimit) {
+        register(RateLimitName("login")) {
+            rateLimiter(limit = 5, refillPeriod = 1.minutes)
+            requestKey { call -> call.request.local.remoteHost }
+        }
+    }
+
+    install(StatusPages) {
+        exception<RequestValidationException> { call, _ ->
+            call.respond(HttpStatusCode.BadRequest, ErrorResponse("invalid request"))
+        }
+        exception<io.ktor.server.plugins.BadRequestException> { call, _ ->
+            call.respond(HttpStatusCode.BadRequest, ErrorResponse("malformed request"))
+        }
+        exception<kotlinx.serialization.SerializationException> { call, _ ->
+            call.respond(HttpStatusCode.BadRequest, ErrorResponse("malformed JSON"))
+        }
+        exception<Throwable> { call, cause ->
+            // Let coroutine cancellation propagate — never swallow it.
+            if (cause is kotlinx.coroutines.CancellationException) throw cause
+            val errorId = UUID.randomUUID().toString().take(8)
+            // Log full detail server-side only; never return to client.
+            call.application.log.error(
+                "unhandled errorId={} path={} type={} msg={}",
+                errorId, call.request.path(), cause.javaClass.simpleName, cause.message,
+            )
+            call.respond(HttpStatusCode.InternalServerError, ErrorResponse("internal", errorId))
+        }
+    }
+
+    install(RequestValidation) {
+        validate<LoginRequest> { req ->
+            when {
+                req.username.length !in 1..64 -> ValidationResult.Invalid("username length 1..64")
+                req.password.length !in 1..256 -> ValidationResult.Invalid("password length 1..256")
+                else -> ValidationResult.Valid
+            }
+        }
+        validate<DeleteItem> { req ->
+            when {
+                req.item.isBlank() -> ValidationResult.Invalid("item required")
+                req.item.length > 4096 -> ValidationResult.Invalid("item too long")
+                req.item.any { it.code < 0x20 || it.code == 0x7F } -> ValidationResult.Invalid("item contains control chars")
+                else -> ValidationResult.Valid
+            }
+        }
+        validate<DownloadItem> { req ->
+            when {
+                req.itemId.isBlank() -> ValidationResult.Invalid("itemId required")
+                !req.itemId.matches(Regex("^[A-Za-z0-9_\\-]{1,128}\$")) ->
+                    ValidationResult.Invalid("itemId must be 1..128 chars of [A-Za-z0-9_-]")
+                else -> ValidationResult.Valid
+            }
+        }
+        validate<ServerSettingsClient> { s ->
+            when {
+                s.filelistUsername.length > 128 -> ValidationResult.Invalid("filelistUsername too long")
+                s.filelistPassword.length > 256 -> ValidationResult.Invalid("filelistPassword too long")
+                s.qbUsername.length > 128 -> ValidationResult.Invalid("qbUsername too long")
+                s.qbPassword.length > 256 -> ValidationResult.Invalid("qbPassword too long")
+                else -> ValidationResult.Valid
+            }
+        }
+    }
 
     val encryptKeyHex = requireEnv(SESSION_ENCRYPT_KEY_HEX)
     val signKeyHex = requireEnv(SESSION_SIGN_KEY_HEX)
-    val isProd = (System.getenv(APP_ENV) ?: DEV_ENV).lowercase() == PROD_ENV
+    // Ktor's SessionTransportTransformerEncrypt uses the encryption key as the
+    // AES-CTR IV too, so it must be exactly 16 bytes (AES-128 block size).
+    // The signing key is HMAC-SHA256; 32 bytes is the recommended minimum.
+    require(hex(encryptKeyHex).size == 16) {
+        "$SESSION_ENCRYPT_KEY_HEX must decode to exactly 16 bytes (AES-128)"
+    }
+    require(hex(signKeyHex).size >= 32) {
+        "$SESSION_SIGN_KEY_HEX must decode to >= 32 bytes (HMAC-SHA256)"
+    }
 
     install(Sessions) {
         cookie<AdminSession>("admin_session") {
             cookie.path = "/"
             cookie.httpOnly = true
-            cookie.secure =
-                isProd   // în dev pe http trebuie false, altfel browserul NU salvează cookie-ul
-            cookie.maxAgeInSeconds = 12.hours.inWholeSeconds
-
-            // SameSite (Ktor: via extensions). :contentReference[oaicite:3]{index=3}
+            cookie.secure = isProd
+            cookie.maxAgeInSeconds = 2.hours.inWholeSeconds
             cookie.extensions["SameSite"] = if (isProd) "Strict" else "Lax"
-
-            // Semnează + criptează conținutul sesiunii în cookie
             transform(SessionTransportTransformerEncrypt(hex(encryptKeyHex), hex(signKeyHex)))
         }
     }
     install(Authentication) {
         session<AdminSession>(ADMIN_SESSION) {
             validate { sess ->
-                if (sess.user == requireEnv(ADMIN_USERNAME)) UserIdPrincipal(sess.user) else null
+                when {
+                    sess.user != requireEnv(ADMIN_USERNAME) -> null
+                    SessionRegistry.isRevoked(sess.sessionId) -> null
+                    else -> UserIdPrincipal(sess.user)
+                }
             }
             challenge {
                 call.respond(HttpStatusCode.Unauthorized, "Login required")
@@ -106,106 +241,227 @@ fun Application.module() {
         }
     }
 
+    // CSRF double-submit: for state-changing methods, require that the
+    // client echoes back the token it received at login via X-CSRF-Token.
+    // A cross-origin attacker can forge a cookie-carrying request but
+    // cannot read the response of /api/login, so cannot know the token.
+    //
+    // Must register AFTER Sessions is installed — otherwise
+    // `call.sessions.get<T>()` throws SessionNotYetConfiguredException.
+    intercept(ApplicationCallPipeline.Plugins) {
+        val path = call.request.path()
+        val method = call.request.httpMethod
+        // Public endpoints and read-only methods are exempt.
+        if (path == "/api/get" || path == "/api/login") return@intercept
+        if (method == HttpMethod.Get || method == HttpMethod.Head || method == HttpMethod.Options) {
+            return@intercept
+        }
+        val session = call.sessions.get<AdminSession>()
+        val header = call.request.header("X-CSRF-Token")
+        if (session == null || header.isNullOrEmpty() || !constantTimeEquals(header, session.csrfToken)) {
+            call.respond(HttpStatusCode.Forbidden, ErrorResponse("csrf"))
+            finish()
+        }
+    }
+
+    SettingsEncriptor.assertKeyAvailable()
+
     val filelistClient = FilelistClient()
     SettingsEncriptor.createServerSettingsIfNotExist()
-    FileManager.configureExistingBase(SettingsEncriptor.readSettingsFromFile().downloadFolder)
+
+    // Base directory is operator-controlled (env), never client-controlled.
+    // Falls back to ~/Downloads if HOMEBOX_DOWNLOAD_FOLDER is not set.
+    val configuredBase = System.getenv(HOMEBOX_DOWNLOAD_FOLDER)
+        ?: Path.of(System.getProperty("user.home"), "Downloads").toString()
+    val baseResult = FileManager.configureExistingBase(configuredBase)
+    if (!baseResult.ok) {
+        System.err.println("FATAL: ${baseResult.message}")
+        exitProcess(1)
+    }
 
     routing {
 
+        // --- Public endpoints ---------------------------------------------
         get("/api/get") {
             call.respondText("Server is running!", ContentType.Text.Plain)
         }
 
-        post("/api/login") {
-            val req = call.receive<LoginRequest>()
-            if (verifyAdminCredentials(req.username, req.password)) {
-                call.sessions.set(
-                    AdminSession(
-                        user = req.username,
-                        issuedAtMillis = System.currentTimeMillis()
+        rateLimit(RateLimitName("login")) {
+            post("/api/login") {
+                val req = call.receive<LoginRequest>()
+                val ip = call.request.local.remoteHost
+                if (verifyAdminCredentials(req.username, req.password)) {
+                    val sessionId = UUID.randomUUID().toString()
+                    val csrfToken = newCsrfToken()
+                    SessionRegistry.register(sessionId)
+                    call.sessions.set(
+                        AdminSession(
+                            user = req.username,
+                            sessionId = sessionId,
+                            issuedAtMillis = System.currentTimeMillis(),
+                            csrfToken = csrfToken,
+                        )
                     )
-                )
-                call.respond(LoginResponse(true))
-            } else {
-                call.respond(LoginResponse(false))
+                    AuditLog.record(who = req.username, ip = ip, action = "login", result = "ok")
+                    call.respond(LoginResponse(true, csrfToken))
+                } else {
+                    AuditLog.record(who = req.username, ip = ip, action = "login", result = "fail")
+                    // Extra artificial delay on failed login to slow brute force
+                    // on top of Argon2's inherent cost and the per-IP rate limit.
+                    kotlinx.coroutines.delay(500)
+                    call.respond(LoginResponse(false))
+                }
             }
         }
 
-        post("/api/loginFileList") {
-            val loginRequest = call.receive<LoginRequest>()
+        // --- Authenticated endpoints --------------------------------------
+        authenticate(ADMIN_SESSION) {
 
-            // First, attempt login
-            val success = filelistClient.login(loginRequest.username, loginRequest.password)
-            call.respond(HttpStatusCode.OK, LoginResponse(success))
-        }
+            post("/api/logout") {
+                val who = call.principal<UserIdPrincipal>()?.name
+                call.sessions.get<AdminSession>()?.let { SessionRegistry.revoke(it.sessionId) }
+                call.sessions.clear<AdminSession>()
+                AuditLog.record(who, call.request.local.remoteHost, "logout")
+                call.respond(HttpStatusCode.OK)
+            }
 
-        get("/api/firstSearch") {
-            println("first search")
-            val results = filelistClient.firstSearch()
-            call.respond(HttpStatusCode.OK, results)
-        }
+            post("/api/logout-all") {
+                val who = call.principal<UserIdPrincipal>()?.name
+                SessionRegistry.revokeAll()
+                call.sessions.clear<AdminSession>()
+                AuditLog.record(who, call.request.local.remoteHost, "logout-all")
+                call.respond(HttpStatusCode.OK)
+            }
 
-        post("/api/search") {
-            println("search")
-            val searchItem = call.receive<SearchCompleteItem>()
-            println(searchItem)
-            val results = filelistClient.search(searchItem)
-            call.respond(HttpStatusCode.OK, results)
-        }
+            get("/api/me") {
+                val principal = call.principal<UserIdPrincipal>()
+                val session = call.sessions.get<AdminSession>()
+                if (principal == null || session == null) {
+                    call.respond(HttpStatusCode.Unauthorized)
+                } else {
+                    // Sliding: refresh issuedAt on every /me and reissue the cookie.
+                    val refreshed = session.copy(issuedAtMillis = System.currentTimeMillis())
+                    call.sessions.set(refreshed)
+                    call.respond(MeResponse(principal.name, refreshed.issuedAtMillis, refreshed.csrfToken))
+                }
+            }
 
-        get("/api/diskSpace") {
-            val usage = withContext(Dispatchers.IO) { getAllDiskUsage() }
-            call.respond(usage)
-        }
+            post("/api/loginFileList") {
+                val loginRequest = call.receive<LoginRequest>()
+                val success = filelistClient.login(loginRequest.username, loginRequest.password)
+                call.respond(HttpStatusCode.OK, LoginResponse(success))
+            }
 
-        get("/api/dirData") {
-            val usage = withContext(Dispatchers.IO) { FileManager.list() }
-            call.respond(usage)
-        }
+            get("/api/firstSearch") {
+                val results = filelistClient.firstSearch()
+                call.respond(HttpStatusCode.OK, results)
+            }
 
-        post("/api/deleteFile") {
-            val fileName = call.receive<DeleteItem>()
-            println("delete file: ${fileName}")
-            val deleted = withContext(Dispatchers.IO) { FileManager.deleteFile(fileName.item) }
-            call.respond(DeleteResponse(deleted.ok))
-        }
+            post("/api/search") {
+                val searchItem = call.receive<SearchCompleteItem>()
+                val results = filelistClient.search(searchItem)
+                call.respond(HttpStatusCode.OK, results)
+            }
 
-        get("/api/qBittorrentRunning") {
-            val isInstalled =
-                withContext(Dispatchers.IO) { QBittorrentUtils.isQbittorrentRunning() }
-            call.respond(isInstalled)
-        }
+            get("/api/diskSpace") {
+                val usage = withContext(Dispatchers.IO) { getAllDiskUsage() }
+                call.respond(usage)
+            }
 
-        post("/api/downloadFile") {
-            val item = call.receive<DownloadItem>()
-            val response =
-                withContext(Dispatchers.IO) { filelistClient.downloadFile(item.itemId) }
-            call.respond(response)
-        }
+            get("/api/dirData") {
+                val usage = withContext(Dispatchers.IO) { FileManager.list() }
+                call.respond(usage)
+            }
 
-        get("/api/torrentsStatus") {
-            val torrents =
-                withContext(Dispatchers.IO) { QBittorrentUtils.getTorrentsList() }
-            call.respond(torrents)
-        }
+            post("/api/deleteFile") {
+                val fileName = call.receive<DeleteItem>()
+                val deleted = withContext(Dispatchers.IO) { FileManager.deleteFile(fileName.item) }
+                AuditLog.record(
+                    who = call.principal<UserIdPrincipal>()?.name,
+                    ip = call.request.local.remoteHost,
+                    action = "deleteFile",
+                    target = fileName.item,
+                    result = if (deleted.ok) "ok" else "fail",
+                )
+                call.respond(DeleteResponse(deleted.ok))
+            }
 
-        post("/api/deleteTorrent") {
-            val hash = call.receive<String>()
-            val response = withContext(Dispatchers.IO) { QBittorrentUtils.deleteTorrent(hash) }
-            call.respond(response)
-        }
+            get("/api/qBittorrentRunning") {
+                val isInstalled =
+                    withContext(Dispatchers.IO) { QBittorrentUtils.isQbittorrentRunning() }
+                call.respond(isInstalled)
+            }
 
-        get("/api/getServerSettings") {
-            val response = SettingsEncriptor.readSettingsFromFile()
-            call.respond(response)
-        }
+            post("/api/downloadFile") {
+                val item = call.receive<DownloadItem>()
+                val response =
+                    withContext(Dispatchers.IO) { filelistClient.downloadFile(item.itemId) }
+                AuditLog.record(
+                    who = call.principal<UserIdPrincipal>()?.name,
+                    ip = call.request.local.remoteHost,
+                    action = "downloadFile",
+                    target = item.itemId,
+                    result = if (response.downloadingStarted) "ok" else "fail",
+                )
+                call.respond(response)
+            }
 
-        post("/api/saveServerSettings") {
-            val settings = call.receive<ServerSettings>()
-            val response =
-                withContext(Dispatchers.IO) { SettingsEncriptor.saveSettingsToFile(settings) }
-            call.respond(response)
+            get("/api/torrentsStatus") {
+                val torrents =
+                    withContext(Dispatchers.IO) { QBittorrentUtils.getTorrentsList() }
+                call.respond(torrents)
+            }
+
+            post("/api/deleteTorrent") {
+                val hash = call.receive<String>()
+                val response = withContext(Dispatchers.IO) { QBittorrentUtils.deleteTorrent(hash) }
+                AuditLog.record(
+                    who = call.principal<UserIdPrincipal>()?.name,
+                    ip = call.request.local.remoteHost,
+                    action = "deleteTorrent",
+                    target = hash,
+                    result = if (response) "ok" else "fail",
+                )
+                call.respond(response)
+            }
+
+            get("/api/getServerSettings") {
+                val response = withContext(Dispatchers.IO) { SettingsEncriptor.readClientSettings() }
+                call.respond(response)
+            }
+
+            post("/api/saveServerSettings") {
+                val settings = call.receive<ServerSettingsClient>()
+                val response =
+                    withContext(Dispatchers.IO) { SettingsEncriptor.saveClientSettings(settings) }
+                AuditLog.record(
+                    who = call.principal<UserIdPrincipal>()?.name,
+                    ip = call.request.local.remoteHost,
+                    action = "saveServerSettings",
+                    result = if (response) "ok" else "fail",
+                )
+                call.respond(response)
+            }
         }
+    }
+}
+
+/**
+ * A pre-computed Argon2id hash of a throwaway password. Used to make the
+ * runtime of the "username does not exist" branch indistinguishable from
+ * the "username exists, verify password" branch (constant-time-ish).
+ */
+private val DUMMY_ARGON2_HASH: String by lazy {
+    val argon2 = de.mkammerer.argon2.Argon2Factory.create(
+        de.mkammerer.argon2.Argon2Factory.Argon2Types.ARGON2id,
+        16,
+        32
+    )
+    try {
+        argon2.hash(3, 1 shl 16, 1, "dummy-not-a-real-password".toCharArray())
+    } catch (_: Exception) {
+        // If hashing fails (shouldn't), fall back to a known-valid PHC that still verifies slowly.
+        "\$argon2id\$v=19\$m=65536,t=3,p=1\$c29tZXNhbHRzb21lc2FsdA\$dummy"
     }
 }
 
@@ -213,11 +469,37 @@ private fun verifyAdminCredentials(username: String, password: String): Boolean 
     val expectedUser = requireEnv(AdminPasswordArgon2.ADMIN_USERNAME)
     val expectedHash = requireEnv(AdminPasswordArgon2.KEY)
 
-    if (username != expectedUser) return false
-    return AdminPasswordArgon2.verifyPassword(expectedHash, password.toCharArray())
+    // Always run Argon2 verify to avoid timing side-channels that leak whether
+    // the username exists. We select the hash based on username match, but
+    // verify runs either way.
+    val usernameMatches = username == expectedUser
+    val hashToVerify = if (usernameMatches) expectedHash else DUMMY_ARGON2_HASH
+
+    val passwordOk = AdminPasswordArgon2.verifyPassword(hashToVerify, password.toCharArray())
+    return usernameMatches && passwordOk
 }
 
 fun requireEnv(name: String): String = System.getenv(name)
     ?: error("Missing env var: $name")
 
 private fun getEnv(name: String): String? = System.getenv(name)
+
+@Serializable
+data class ErrorResponse(val error: String, val errorId: String? = null)
+
+private val csrfRng = java.security.SecureRandom()
+
+private fun newCsrfToken(): String {
+    val bytes = ByteArray(32).also { csrfRng.nextBytes(it) }
+    return java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(bytes)
+}
+
+/** Length-independent, constant-time string comparison for secrets. */
+private fun constantTimeEquals(a: String, b: String): Boolean {
+    if (a.length != b.length) return false
+    var diff = 0
+    for (i in a.indices) {
+        diff = diff or (a[i].code xor b[i].code)
+    }
+    return diff == 0
+}

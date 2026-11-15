@@ -1,137 +1,369 @@
-This is a Kotlin Multiplatform project targeting Web, Server.
+# HomeBoxServerUi
 
-* [/composeApp](./composeApp/src) is for code that will be shared across your Compose Multiplatform
-  applications.
-  It contains several subfolders:
-    - [commonMain](./composeApp/src/commonMain/kotlin) is for code that’s common for all targets.
-    - Other folders are for Kotlin code that will be compiled for only the platform indicated in the
-      folder name.
-      For example, if you want to use Apple’s CoreCrypto for the iOS part of your Kotlin app,
-      the [iosMain](./composeApp/src/iosMain/kotlin) folder would be the right place for such calls.
-      Similarly, if you want to edit the Desktop (JVM) specific part,
-      the [jvmMain](./composeApp/src/jvmMain/kotlin)
-      folder is the appropriate location.
+Kotlin Multiplatform application exposing a Ktor backend + Compose Multiplatform
+web UI (WASM/JS) for managing torrent downloads on a home server. Fronted by
+Caddy for HTTPS, talks to a local qBittorrent instance over loopback.
 
-* [/server](./server/src/main/kotlin) is for the Ktor server application.
-
-* [/shared](./shared/src) is for the code that will be shared between all targets in the project.
-  The most important subfolder is [commonMain](./shared/src/commonMain/kotlin). If preferred, you
-  can add code to the platform-specific folders here too.
-
-### Build and Run Server
-
-To build and run the development version of the server, use the run configuration from the run
-widget
-in your IDE’s toolbar or run it directly from the terminal:
-
-- on macOS/Linux
-  ```shell
-  ./gradlew :server:run
-  ```
-
-  ```shell
-  ./gradlew kotlinWasmUpgradeYarnLock
-  ```
-
- ```shell
-./gradlew kotlinWasmUpgradeYarnLock
- ```
-
-  ```shell
-  ./gradlew run
-  ```
-
-- on Windows
-  ```shell
-  .\gradlew.bat :server:run
-  ```
-
-### Build and Run Web Application
-
-To build and run the development version of the web app, use the run configuration from the run
-widget
-in your IDE's toolbar or run it directly from the terminal:
-
-- for the Wasm target (faster, modern browsers):
-    - on macOS/Linux
-      ```shell
-      ./gradlew :composeApp:wasmJsBrowserDevelopmentRun
-      ```
-    - on Windows
-      ```shell
-      .\gradlew.bat :composeApp:wasmJsBrowserDevelopmentRun
-      ```
-- for the JS target (slower, supports older browsers):
-    - on macOS/Linux
-      ```shell
-      ./gradlew :composeApp:jsBrowserDevelopmentRun
-      ```
-    - on Windows
-      ```shell
-      .\gradlew.bat :composeApp:jsBrowserDevelopmentRun
-      ```
+```
+   Internet ──HTTPS──▶ Caddy ──┬─▶ /api/*  →  Ktor (127.0.0.1:8085)
+   (80/443)                    │                     │
+                               │                     └─▶ qBittorrent (127.0.0.1:8080)
+                               └─▶ /*      →  Static UI (127.0.0.1:8086)
+```
 
 ---
 
-```shell
-./gradlew :composeApp:jsBrowserDistribution
+## 1. Quick deploy (recommended)
+
+The installer does everything: Java, qBittorrent, Caddy, UFW, systemd units,
+secrets, admin password. It is idempotent — safe to re-run for updates.
+
+### On your dev machine
+
+```bash
+# Requires JDK 17 (not 21/25 — Gradle 8.14 limitation)
+JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64 ./gradlew :server:packageInstaller
 ```
 
-#Install caddy on server and setup(face redirect la 8085 deja..)
-curl -k https://homestreambox.go.ro/get
+Produces `server/build/distributions/server-shadow-1.0.0.tar` (~21 MB).
 
+### On the server (Ubuntu/Debian or Fedora/RHEL)
 
-# start UI
-(run build from compose app -> ![img.png](img.png))
-python3 -m http.server 8086 --bind 127.0.0.1
+```bash
+SERVER=user@your-server   # e.g. iosifdaniel07@5.15.3.29
 
-# Setup ui for caddy...
-# for server
-handle /ui/* {
-reverse_proxy 127.0.0.1:8086
-}
+# Upload
+scp server/build/distributions/server-shadow-1.0.0.tar $SERVER:/tmp/
 
-#restart caddy
-sudo caddy validate --config /etc/caddy/Caddyfile
-sudo systemctl restart caddy
+# Install
+ssh $SERVER "sudo tar -xf /tmp/server-shadow-1.0.0.tar -C /opt/ && sudo /opt/server-shadow-1.0.0/bin/install.sh"
+```
 
-# Caddyfile
-homestreambox.go.ro {
-tls iosifdaniel07@yahoo.com
+The wizard asks you, in order:
 
-    # Proxy the root domain to port 8085
-    reverse_proxy 127.0.0.1:8087 # UI
+1. Install qBittorrent-nox (Y/n). If yes, generates a random WebUI password.
+2. Install Caddy (Y/n). If yes, asks for your domain + Let's Encrypt email.
+3. Reset firewall (Y/n). If yes, asks which port your SSH runs on.
+4. Admin password (one-shot interactive prompt).
 
-    handle /api/* {
-        reverse_proxy 127.0.0.1:8085 # Server
-    }
-}
+At the end the installer prints a credentials summary and saves it to
+`/root/homebox-credentials.txt` (chmod 600). Copy them into the HomeBox UI
+under *Settings*, then shred the file:
 
-# setup ufw
-`sudo ufw status
-sudo ufw allow 8090/tcp
-sudo ufw allow 80
-sudo ufw allow 443
-sudo ufw reload`
+```bash
+sudo shred -u /root/homebox-credentials.txt
+```
 
+### Updating
 
-#start server
-curl -k https://homestreambox.go.ro/api/get
+Re-run the installer with a new tarball — secrets, admin password and
+qBittorrent config are preserved. Only the JAR is replaced and the service
+restarted.
 
-@SFTP
-sftp -P 2222 iosifdaniel07@homestreambox.go.ro
-ssh -p 2222 iosifdaniel07@homestreambox.go.ro
+---
 
-# server script 
-sudo nano /etc/systemd/system/start_server.service
-python3 ~/start_server.py
+## 2. Installer sub-commands
 
-Learn more
-about [Kotlin Multiplatform](https://www.jetbrains.com/help/kotlin-multiplatform-dev/get-started.html),
-[Compose Multiplatform](https://github.com/JetBrains/compose-multiplatform/#compose-multiplatform),
-[Kotlin/Wasm](https://kotl.in/wasm/)…
+```bash
+sudo /opt/server-shadow-*/bin/install.sh status       # systemd + ports + UFW
+sudo /opt/server-shadow-*/bin/install.sh logs         # audit + journalctl
+sudo /opt/server-shadow-*/bin/install.sh credentials  # print saved creds
+sudo /opt/server-shadow-*/bin/install.sh regen-keys   # DESTRUCTIVE: new keys
+```
 
-We would appreciate your feedback on Compose/Web and Kotlin/Wasm in the public Slack
-channel [#compose-web](https://slack-chats.kotlinlang.org/c/compose-web).
-If you face any issues, please report them
-on [YouTrack](https://youtrack.jetbrains.com/newIssue?project=CMP).
+`regen-keys` invalidates every session cookie and makes every stored password
+unreadable. Use only after a confirmed compromise.
+
+---
+
+## 3. What the installer puts on disk
+
+| Path | Purpose | Permissions |
+|------|---------|-------------|
+| `/opt/homebox/server.jar` | application fat JAR | `0640 root:homebox` |
+| `/etc/homebox/env` | operator secrets (session + settings keys) | `0640 root:homebox` |
+| `/var/lib/homebox/` | app home + systemd WorkingDirectory | `0750 homebox:homebox` |
+| `/var/lib/homebox/.config/myserver/env` | admin Argon2 hash (JAR-written) | `0640 homebox:homebox` |
+| `/var/lib/homebox/server_settings.json` | encrypted qBit/FileList credentials | `0600 homebox:homebox` |
+| `/srv/homebox/downloads/` | FileManager base dir (downloads live here) | `0750 homebox:homebox` |
+| `/var/log/homebox/audit.log` | JSON-lines audit log (login, delete, settings change) | `0600 homebox:homebox` |
+| `/etc/systemd/system/homebox.service` | hardened systemd unit | `0644 root:root` |
+| `/etc/systemd/system/qbittorrent-nox.service` | loopback-only qBittorrent | `0644 root:root` |
+| `/etc/caddy/Caddyfile` | HSTS/CSP/body-limit reverse proxy | `0644 root:root` |
+
+---
+
+## 4. Environment variables
+
+Set in `/etc/homebox/env` (operator) and
+`/var/lib/homebox/.config/myserver/env` (admin password, written by the JAR
+on first run). systemd loads both files.
+
+### Required
+
+| Var | Meaning |
+|-----|---------|
+| `SESSION_ENCRYPT_KEY_HEX` | 32 hex chars = 16 bytes, AES-128 cookie encryption (Ktor requires exactly 16). |
+| `SESSION_SIGN_KEY_HEX` | ≥ 64 hex chars = ≥ 32 bytes, HMAC-SHA256 cookie signature. |
+| `SETTINGS_ENC_KEY_HEX` | 64 hex chars = 32 bytes, AES-256-GCM for server_settings.json. |
+| `ADMIN_USERNAME` | web UI login name (default `admin`). |
+| `ADMIN_PASSWORD_ARGON2ID` | Argon2id hash generated interactively on first run. |
+
+### Optional (with safe defaults)
+
+| Var | Default | Notes |
+|-----|---------|-------|
+| `APP_ENV` | `dev` | Must be `prod` for Secure cookies + SameSite=Strict + CORS lockdown. Installer sets this. |
+| `HOMEBOX_HOST` | `127.0.0.1` (prod) / `0.0.0.0` (dev) | Bind address. |
+| `HOMEBOX_PORT` | `8085` | Backend port. |
+| `HOMEBOX_DOWNLOAD_FOLDER` | `$HOME/Downloads` | FileManager base dir. **Never client-controllable.** |
+| `HOMEBOX_SETTINGS_FILE` | `$HOME/server_settings.json` | Encrypted settings location. |
+| `HOMEBOX_QBITTORRENT_URL` | `http://127.0.0.1:8080` | qBittorrent WebUI endpoint. |
+| `HOMEBOX_AUDIT_LOG` | `$HOME/homebox_audit.log` | Append-only JSON audit log. |
+
+---
+
+## 5. Development
+
+### Toolchain
+
+- JDK 17 (`/usr/lib/jvm/java-17-openjdk-amd64` on Ubuntu). The repo does **not**
+  compile on JDK 25 due to Gradle 8.14 limitations.
+- Gradle wrapper included, no system Gradle needed.
+
+### Build everything
+
+```bash
+JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64 ./gradlew build
+```
+
+### Run the backend locally (dev mode)
+
+```bash
+export SESSION_ENCRYPT_KEY_HEX=$(openssl rand -hex 16)
+export SESSION_SIGN_KEY_HEX=$(openssl rand -hex 32)
+export SETTINGS_ENC_KEY_HEX=$(openssl rand -hex 32)
+export ADMIN_USERNAME=admin
+export APP_ENV=dev
+export HOMEBOX_DOWNLOAD_FOLDER=$PWD/.dev-downloads
+mkdir -p $PWD/.dev-downloads
+./gradlew :server:run
+# First run: it will prompt you interactively for an admin password.
+```
+
+### Run the web UI locally
+
+```bash
+./gradlew :composeApp:wasmJsBrowserDevelopmentRun
+# or
+./gradlew :composeApp:jsBrowserDevelopmentRun
+```
+
+### Run the tests
+
+```bash
+./gradlew :server:test
+```
+
+14 integration tests cover: auth model, CSRF, request validation, path
+traversal defence, settings encryption round-trip + IV randomness.
+
+---
+
+## 6. Operations
+
+### Service status
+
+```bash
+systemctl status homebox.service
+systemctl status qbittorrent-nox.service
+systemctl status caddy.service
+```
+
+### Logs
+
+```bash
+# Audit log (login/logout, deleteFile, deleteTorrent, saveServerSettings)
+sudo tail -f /var/log/homebox/audit.log
+
+# App logs
+sudo journalctl -u homebox.service -f
+
+# Caddy access log
+sudo tail -f /var/log/caddy/access.log
+```
+
+### Secret rotation
+
+- **Session keys** (every 90 days or on suspicion): re-run installer with
+  `regen-keys`. All users must log in again.
+- **Admin password**: delete `/var/lib/homebox/.config/myserver/env`, restart
+  the service — it will prompt for a new one on next startup. Must restart
+  with a TTY attached once.
+- **qBittorrent WebUI password**: edit `/var/lib/qbittorrent/.config/qBittorrent/qBittorrent.conf`,
+  update the `WebUI\Password_PBKDF2` entry, then update the saved password
+  in the HomeBox UI under *Settings*.
+
+### Backup
+
+Back these up before updating:
+- `/etc/homebox/env` — operator secrets
+- `/var/lib/homebox/.config/myserver/env` — admin password hash
+- `/var/lib/homebox/server_settings.json` — encrypted settings
+
+```bash
+sudo tar --preserve-permissions -czf homebox-backup-$(date +%F).tar.gz \
+    /etc/homebox/env \
+    /var/lib/homebox/.config/myserver/env \
+    /var/lib/homebox/server_settings.json
+```
+
+---
+
+## 7. Security model
+
+### Authentication
+
+- Session cookies, HttpOnly + Secure (prod) + SameSite=Strict (prod).
+- Argon2id for the admin password (m=65536 KiB, t=3, p=1).
+- Login is rate-limited to 5 attempts per minute per IP, plus a 500ms
+  artificial delay on failure. `verifyAdminCredentials` runs Argon2 even
+  for unknown usernames to prevent timing enumeration.
+
+### CSRF
+
+- Double-submit token model. Login response carries `csrfToken`; UI sends
+  it back via `X-CSRF-Token` on every POST/PUT/DELETE. Compared constant-time.
+
+### Authorization
+
+- All endpoints except `/api/get` and `/api/login` sit inside
+  `authenticate(ADMIN_SESSION) { ... }`. There is exactly one admin account.
+
+### Transport
+
+- CORS locked to the configured prod host; in dev, only localhost origins.
+- Request body size capped at 2 MB app-side (Caddy also enforces 2 MB).
+- `StatusPages` returns `{error, errorId}` — stack traces never reach the
+  client; the full error is logged under `errorId` server-side.
+- `CancellationException` is re-raised so coroutine cancellation is not
+  swallowed by the 500 handler.
+
+### File system
+
+- `FileManager.configureExistingBase` uses `toRealPath()` at boot to resolve
+  symlinks once; every later path is compared against the canonical base.
+- Path validation rejects: NUL + all control chars (0x00..0x1F, 0x7F),
+  parent traversal, absolute paths, segments > 255 chars, total path > 4096.
+- `deleteFile` refuses to delete the base dir itself and filters every
+  entry walked to `startsWith(base)`.
+- List recursion is capped at depth 10.
+- `DirListing` strips the absolute path — clients only see paths relative
+  to the base.
+
+### Secrets at rest
+
+- `server_settings.json` is AES-256-GCM, random 12-byte IV per encryption,
+  format: `gcm1$base64(iv||ciphertext||tag)`. Key is `SETTINGS_ENC_KEY_HEX`,
+  never derived from anything client-visible.
+- Legacy ECB-formatted values are discarded on read (installer-written
+  configs are always GCM).
+- Settings file is chmod 0600 after every write.
+
+### Audit
+
+Every security-relevant action writes a JSON line to `/var/log/homebox/audit.log`:
+`login` (ok/fail), `logout`, `logout-all`, `saveServerSettings`, `deleteFile`,
+`downloadFile`, `deleteTorrent`. The log file is chmod 0600 and append-only
+in practice (file-system `chattr +a` is left to the operator).
+
+### Network
+
+- Backend bound to `127.0.0.1:8085` in prod — Caddy fronts it.
+- qBittorrent bound to `127.0.0.1:8080` — also fronted by HomeBox calls.
+- UFW default-deny with only 80/443/SSH open from the public internet.
+- Plex and qBittorrent WebUI must **never** be port-forwarded on the router.
+
+---
+
+## 8. Threat model: what is NOT in scope
+
+- **Compromise of the admin account** — treat the admin password as the keys
+  to the kingdom. If it leaks, rotate via the Admin password section above
+  and run `regen-keys`.
+- **Host-level compromise** — if someone has shell on the machine as root or
+  as the `homebox` user, they can read the session key and decrypt everything.
+  The sandbox limits blast radius but doesn't make the box magic-safe.
+- **Supply-chain attacks on dependencies** — Jsoup, Ktor, Argon2-jvm, logback
+  are all declared in `libs.versions.toml`. Run `./gradlew dependencyUpdates`
+  monthly and watch CVE feeds.
+
+---
+
+## 9. Troubleshooting
+
+### Installer fails: `openssl kdf` not found
+
+Older OpenSSL (< 3.0) doesn't ship `kdf` command. The installer falls back
+to Python 3 for PBKDF2; make sure `python3` is installed:
+
+```bash
+sudo apt install python3
+```
+
+### Backend refuses to start: `$SESSION_ENCRYPT_KEY_HEX must decode to exactly 16 bytes`
+
+The app enforces exact key lengths. If you rotated by hand, regenerate with:
+
+```bash
+openssl rand -hex 16   # SESSION_ENCRYPT_KEY_HEX
+openssl rand -hex 32   # SESSION_SIGN_KEY_HEX
+openssl rand -hex 32   # SETTINGS_ENC_KEY_HEX
+```
+
+### Logging in from browser: `403 csrf`
+
+The UI didn't receive or lost the CSRF token. Hard-refresh the login page.
+If using a non-UI client, call `/api/me` after login to obtain a fresh token
+and echo it back via `X-CSRF-Token` on every POST.
+
+### `settings value in legacy format detected; discarding`
+
+You restored a `server_settings.json` written by an older ECB build. The
+server now ignores it and treats the fields as empty. Re-enter the FileList
+and qBittorrent credentials in the UI Settings page.
+
+### qBittorrent WebUI unreachable from the LAN
+
+By design. The installer binds qBittorrent to 127.0.0.1 only. If you need
+local access, add a UFW rule limited to your LAN:
+
+```bash
+sudo ufw allow from 192.168.1.0/24 to any port 8080 proto tcp
+```
+
+and change `WebUI\Address` in `qBittorrent.conf` to `0.0.0.0`.
+
+### `nmap -p- IP` from the internet shows more than 80/443/SSH
+
+Check two places:
+- `sudo ufw status verbose` — expected rules only.
+- Your home router — remove any NAT/port-forward rules that send traffic
+  to 8080, 8085, 8086, 32400 (Plex) or any UPnP-added rule.
+
+---
+
+## 10. Known not-done
+
+- GitHub Actions / CI with Snyk + gitleaks scanning (plugin is wired but no
+  pipeline file exists).
+- Durable session revocation list (the in-memory set is cleared on restart).
+- fail2ban integration — Caddy's JSON log is easy to tail if you want to
+  add a jail yourself.
+- Automatic Plex update management. This app does not touch Plex.
+
+---
+
+## License
+
+Not set. Add one if you plan to publish.

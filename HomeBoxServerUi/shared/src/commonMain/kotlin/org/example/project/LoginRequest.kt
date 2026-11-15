@@ -11,4 +11,12 @@ data class LoginRequest(
 @Serializable
 data class LoginResponse(
     val isSuccess: Boolean,
+    val csrfToken: String? = null,
+)
+
+@Serializable
+data class MeResponse(
+    val user: String,
+    val issuedAtMillis: Long,
+    val csrfToken: String,
 )

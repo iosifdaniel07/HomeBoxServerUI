@@ -1,0 +1,21 @@
+[Unit]
+Description=HomeBox Media Server and Player UI
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=iosifdaniel07
+WorkingDirectory=/opt/homebox-media
+Environment=HOMEBOX_ENV=prod
+Environment=HOMEBOX_PORT=8090
+Environment=HOMEBOX_WEB_DIR=/opt/homebox-media/web
+EnvironmentFile=/etc/homebox-media.env
+ExecStart=/opt/homebox-media/server/bin/server
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
