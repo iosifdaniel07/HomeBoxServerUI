@@ -18,25 +18,41 @@ Caddy for HTTPS, talks to a local qBittorrent instance over loopback.
 The installer does everything: Java, qBittorrent, Caddy, UFW, systemd units,
 secrets, admin password. It is idempotent — safe to re-run for updates.
 
-### On your dev machine
+### Step 1 — Build on your dev machine
 
 ```bash
 # Requires JDK 17 (not 21/25 — Gradle 8.14 limitation)
-JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64 ./gradlew :server:packageInstaller
+JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64 ./gradlew :server:shadowJar
 ```
 
-Produces `server/build/distributions/server-shadow-1.0.0.tar` (~21 MB).
+Produces `server/build/libs/server-all.jar` (~21 MB, all dependencies bundled).
 
-### On the server (Ubuntu/Debian or Fedora/RHEL)
+### Step 2 — Copy to the server
 
 ```bash
-SERVER=user@your-server   # e.g. iosifdaniel07@5.15.3.29
+# Adjust user/IP/port to match your server
+SERVER=homebox@192.168.1.129
+SSH_PORT=2222
 
-# Upload
-scp server/build/distributions/server-shadow-1.0.0.tar $SERVER:/tmp/
+scp -P $SSH_PORT server/build/libs/server-all.jar $SERVER:/tmp/
+scp -P $SSH_PORT server/install.sh $SERVER:/tmp/
+```
 
-# Install
-ssh $SERVER "sudo tar -xf /tmp/server-shadow-1.0.0.tar -C /opt/ && sudo /opt/server-shadow-1.0.0/bin/install.sh"
+### Step 3 — Run the installer (first time only)
+
+```bash
+ssh -p $SSH_PORT $SERVER
+sudo bash /tmp/install.sh install
+```
+
+### Step 4 — Update (JAR only, no full reinstall)
+
+```bash
+scp -P $SSH_PORT server/build/libs/server-all.jar $SERVER:/tmp/
+ssh -p $SSH_PORT $SERVER \
+  "sudo systemctl stop homebox-media && \
+   sudo cp /tmp/server-all.jar /opt/homebox-media/server.jar && \
+   sudo systemctl start homebox-media"
 ```
 
 The wizard asks you, in order:
@@ -165,8 +181,10 @@ mkdir -p $PWD/.dev-downloads
 ./gradlew :server:test
 ```
 
-14 integration tests cover: auth model, CSRF, request validation, path
-traversal defence, settings encryption round-trip + IV randomness.
+27 integration tests cover: auth model, CSRF, request validation, path
+traversal defence, settings encryption round-trip + IV randomness, TOTP
+unit tests (secret generation, URI format, code validation), 2FA endpoint
+auth guards, and settings totpSecret round-trip.
 
 ---
 
