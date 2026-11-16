@@ -6,6 +6,7 @@ import kotlinx.serialization.json.Json
 import org.example.project.serverData.MASKED_PASSWORD_SENTINEL
 import org.example.project.serverData.ServerSettings
 import org.example.project.serverData.ServerSettingsClient
+import org.example.project.serverData.TotpDevice
 import org.slf4j.LoggerFactory
 import java.nio.file.Files
 import java.nio.file.Path
@@ -136,7 +137,7 @@ object SettingsEncriptor {
      */
     fun createServerSettingsIfNotExist() {
         val filePath = settingsFilePath()
-        val defaultSettings = ServerSettings("", "", "", "", "", totpSecret = null)
+        val defaultSettings = ServerSettings("", "", "", "", "")
         if (!Files.exists(filePath)) {
             Files.createDirectories(filePath.parent)
             Files.createFile(filePath)
@@ -176,7 +177,7 @@ object SettingsEncriptor {
             filelistPassword = if (s.filelistPassword.isNotEmpty()) MASKED_PASSWORD_SENTINEL else "",
             qbUsername = s.qbUsername,
             qbPassword = if (s.qbPassword.isNotEmpty()) MASKED_PASSWORD_SENTINEL else "",
-            totpEnabled = !s.totpSecret.isNullOrEmpty(),
+            totpDeviceNames = s.totpDevices.map { it.name },
         )
     }
 
@@ -210,10 +211,21 @@ object SettingsEncriptor {
             val filePath = settingsFilePath()
             val jsonString = Files.readString(filePath)
             val decoded = Json.decodeFromString<ServerSettings>(jsonString)
+            val decryptedDevices = decoded.totpDevices.map { d ->
+                TotpDevice(d.name, if (d.secret.isNotEmpty()) decrypt(d.secret) else "")
+            }
+            val legacySecret = decoded.totpSecret
+            val migratedDevices = if (decryptedDevices.isEmpty() && !legacySecret.isNullOrEmpty()) {
+                val migratedSecret = decrypt(legacySecret)
+                if (migratedSecret.isNotEmpty()) listOf(TotpDevice("Device 1", migratedSecret)) else emptyList()
+            } else {
+                decryptedDevices
+            }
             decoded.copy(
                 filelistPassword = if (decoded.filelistPassword.isNotEmpty()) decrypt(decoded.filelistPassword) else "",
                 qbPassword = if (decoded.qbPassword.isNotEmpty()) decrypt(decoded.qbPassword) else "",
-                totpSecret = decoded.totpSecret?.takeIf { it.isNotEmpty() }?.let { decrypt(it) },
+                totpSecret = null,
+                totpDevices = migratedDevices,
             )
         } catch (e: Exception) {
             log.error("failed to read settings: {}", e.message)
@@ -262,7 +274,10 @@ object SettingsEncriptor {
                 settings.copy(
                     qbPassword = encrypt(settings.qbPassword),
                     filelistPassword = encrypt(settings.filelistPassword),
-                    totpSecret = settings.totpSecret?.takeIf { it.isNotEmpty() }?.let { encrypt(it) },
+                    totpSecret = null,
+                    totpDevices = settings.totpDevices.map { d ->
+                        TotpDevice(d.name, if (d.secret.isNotEmpty()) encrypt(d.secret) else "")
+                    },
                 )
             )
 

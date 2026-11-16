@@ -287,7 +287,7 @@ class ApplicationTest {
     }
 
     // -----------------------------------------------------------------
-    // Settings: totpSecret round-trip
+    // Settings: TotpDevice round-trip
     // -----------------------------------------------------------------
 
     @Test
@@ -300,22 +300,20 @@ class ApplicationTest {
     }
 
     @Test
-    fun `readClientSettings returns totpEnabled false when no secret set`() {
-        // With a fresh settings file (no totpSecret), totpEnabled should be false
+    fun `readClientSettings returns empty totpDeviceNames when no devices set`() {
         val settings = org.example.project.serverData.ServerSettings(
             downloadFolder = "",
             filelistUsername = "",
             filelistPassword = "",
             qbUsername = "",
             qbPassword = "",
-            totpSecret = null,
+            totpDevices = emptyList(),
         )
-        // totpEnabled = !totpSecret.isNullOrEmpty()
-        assertFalse(!settings.totpSecret.isNullOrEmpty())
+        assertTrue(settings.totpDevices.isEmpty())
     }
 
     @Test
-    fun `readClientSettings returns totpEnabled true when secret is set`() {
+    fun `readClientSettings returns totpDeviceNames when devices set`() {
         val secret = TotpManager.generateSecretBase32()
         val settings = org.example.project.serverData.ServerSettings(
             downloadFolder = "",
@@ -323,9 +321,9 @@ class ApplicationTest {
             filelistPassword = "",
             qbUsername = "",
             qbPassword = "",
-            totpSecret = secret,
+            totpDevices = listOf(org.example.project.serverData.TotpDevice("Phone 1", secret)),
         )
-        assertTrue(!settings.totpSecret.isNullOrEmpty())
+        assertEquals(listOf("Phone 1"), settings.totpDevices.map { it.name })
     }
 
     // -----------------------------------------------------------------

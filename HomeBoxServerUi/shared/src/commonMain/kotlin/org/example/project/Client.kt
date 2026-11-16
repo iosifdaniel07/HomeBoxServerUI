@@ -166,21 +166,25 @@ object Client {
     suspend fun setupTotp(): TotpSetupResponse =
         client.get("${host}/totp/setup").body()
 
-    suspend fun enableTotp(secret: String, code: String): Boolean = try {
+    suspend fun enableTotp(secret: String, code: String, deviceName: String = "Device"): Boolean = try {
         client.post("${host}/totp/enable") {
             withCsrf()
             contentType(ContentType.Application.Json)
-            setBody(TotpEnableRequest(secret, code))
+            setBody(TotpEnableRequest(secret, code, deviceName))
         }.status == io.ktor.http.HttpStatusCode.OK
     } catch (_: Exception) { false }
 
-    suspend fun disableTotp(code: String): Boolean = try {
+    suspend fun disableTotp(code: String, deviceName: String? = null): Boolean = try {
         client.post("${host}/totp/disable") {
             withCsrf()
             contentType(ContentType.Application.Json)
-            setBody(TotpDisableRequest(code))
+            setBody(TotpDisableRequest(code, deviceName))
         }.status == io.ktor.http.HttpStatusCode.OK
     } catch (_: Exception) { false }
+
+    suspend fun getTotpDevices(): List<String> = try {
+        client.get("${host}/totp/devices").body()
+    } catch (_: Exception) { emptyList() }
 
     // Clean up resources when done
     fun close() {

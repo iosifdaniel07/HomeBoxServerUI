@@ -30,7 +30,7 @@ data class TotpVerifyRequest(val pendingToken: String, val code: String)
 data class TotpSetupResponse(val otpauthUri: String, val secret: String)
 
 @Serializable
-data class TotpEnableRequest(val secret: String, val code: String)
+data class TotpEnableRequest(val secret: String, val code: String, val deviceName: String = "Device")
 
 @Serializable
-data class TotpDisableRequest(val code: String)
+data class TotpDisableRequest(val code: String, val deviceName: String? = null)

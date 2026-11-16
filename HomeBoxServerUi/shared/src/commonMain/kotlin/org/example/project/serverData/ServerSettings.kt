@@ -2,6 +2,9 @@ package org.example.project.serverData
 
 import kotlinx.serialization.Serializable
 
+@Serializable
+data class TotpDevice(val name: String, val secret: String)
+
 /**
  * Server-side storage format. `downloadFolder` is operator-controlled and
  * never exposed to or accepted from the web client.
@@ -14,6 +17,7 @@ data class ServerSettings(
     val qbUsername: String,
     val qbPassword: String,
     val totpSecret: String? = null,
+    val totpDevices: List<TotpDevice> = emptyList(),
 )
 
 /**
@@ -25,7 +29,7 @@ data class ServerSettings(
  *  - [MASKED_PASSWORD_SENTINEL] — set on the server but hidden from client
  *  - any other value — new password (will replace existing)
  *
- * `totpEnabled` is read-only from the client — 2FA is managed via the totp endpoints.
+ * `totpDeviceNames` is read-only from the client — 2FA is managed via the totp endpoints.
  */
 @Serializable
 data class ServerSettingsClient(
@@ -33,7 +37,7 @@ data class ServerSettingsClient(
     val filelistPassword: String,
     val qbUsername: String,
     val qbPassword: String,
-    val totpEnabled: Boolean = false,
+    val totpDeviceNames: List<String> = emptyList(),
 )
 
 /** Shared sentinel for masked passwords. Kept in shared so UI code can detect it. */

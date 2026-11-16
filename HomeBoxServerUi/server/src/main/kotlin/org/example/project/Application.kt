@@ -48,6 +48,7 @@ import org.example.project.serverData.DeleteResponse
 import org.example.project.serverData.DownloadItem
 import org.example.project.serverData.ServerSettings
 import org.example.project.serverData.ServerSettingsClient
+import org.example.project.serverData.TotpDevice
 import org.slf4j.event.Level
 import java.nio.file.Path
 import java.util.UUID
@@ -220,6 +221,7 @@ fun Application.module() {
             when {
                 r.secret.isBlank() || r.secret.length > 64 -> ValidationResult.Invalid("invalid secret")
                 r.code.length != 6 || !r.code.all { it.isDigit() } -> ValidationResult.Invalid("code must be 6 digits")
+                r.deviceName.isBlank() || r.deviceName.length > 64 -> ValidationResult.Invalid("deviceName must be 1..64 chars")
                 else -> ValidationResult.Valid
             }
         }
@@ -319,7 +321,7 @@ fun Application.module() {
                 val ip = call.request.local.remoteHost
                 if (verifyAdminCredentials(req.username, req.password)) {
                     val settings = SettingsEncriptor.readSettingsFromFile()
-                    if (!settings.totpSecret.isNullOrEmpty()) {
+                    if (settings.totpDevices.isNotEmpty()) {
                         val pendingToken = PendingTotpRegistry.create(req.username)
                         AuditLog.record(who = req.username, ip = ip, action = "login", result = "totp-required")
                         call.respond(LoginResponse(isSuccess = false, totpRequired = true, pendingToken = pendingToken))
@@ -354,8 +356,8 @@ fun Application.module() {
                     call.respond(LoginResponse(false))
                     return@post
                 }
-                val secret = SettingsEncriptor.readSettingsFromFile().totpSecret
-                if (secret.isNullOrEmpty() || !TotpManager.verify(secret, req.code)) {
+                val devices = SettingsEncriptor.readSettingsFromFile().totpDevices
+                if (devices.isEmpty() || devices.none { TotpManager.verify(it.secret, req.code) }) {
                     AuditLog.record(who = username, ip = ip, action = "totp-verify", result = "fail")
                     kotlinx.coroutines.delay(500)
                     call.respond(LoginResponse(false))
@@ -424,7 +426,8 @@ fun Application.module() {
                     return@post
                 }
                 val existing = SettingsEncriptor.readSettingsFromFile()
-                SettingsEncriptor.saveSettingsToFile(existing.copy(totpSecret = req.secret))
+                val newDevice = TotpDevice(req.deviceName, req.secret)
+                SettingsEncriptor.saveSettingsToFile(existing.copy(totpDevices = existing.totpDevices + newDevice))
                 AuditLog.record(who, ip, "totp-enable", result = "ok")
                 call.respond(HttpStatusCode.OK)
             }
@@ -433,16 +436,31 @@ fun Application.module() {
                 val req = call.receive<TotpDisableRequest>()
                 val who = call.principal<UserIdPrincipal>()?.name
                 val ip = call.request.local.remoteHost
-                val secret = SettingsEncriptor.readSettingsFromFile().totpSecret
-                if (secret.isNullOrEmpty() || !TotpManager.verify(secret, req.code)) {
-                    AuditLog.record(who, ip, "totp-disable", result = "fail")
-                    call.respond(HttpStatusCode.BadRequest, ErrorResponse("invalid code"))
-                    return@post
-                }
                 val existing = SettingsEncriptor.readSettingsFromFile()
-                SettingsEncriptor.saveSettingsToFile(existing.copy(totpSecret = null))
+                val deviceName = req.deviceName
+                if (deviceName == null) {
+                    if (existing.totpDevices.none { TotpManager.verify(it.secret, req.code) }) {
+                        AuditLog.record(who, ip, "totp-disable", result = "fail")
+                        call.respond(HttpStatusCode.BadRequest, ErrorResponse("invalid code"))
+                        return@post
+                    }
+                    SettingsEncriptor.saveSettingsToFile(existing.copy(totpDevices = emptyList()))
+                } else {
+                    val device = existing.totpDevices.find { it.name == deviceName }
+                    if (device == null || !TotpManager.verify(device.secret, req.code)) {
+                        AuditLog.record(who, ip, "totp-disable", result = "fail")
+                        call.respond(HttpStatusCode.BadRequest, ErrorResponse("invalid code"))
+                        return@post
+                    }
+                    SettingsEncriptor.saveSettingsToFile(existing.copy(totpDevices = existing.totpDevices.filter { it.name != deviceName }))
+                }
                 AuditLog.record(who, ip, "totp-disable", result = "ok")
                 call.respond(HttpStatusCode.OK)
+            }
+
+            get("/api/totp/devices") {
+                val devices = SettingsEncriptor.readSettingsFromFile().totpDevices.map { it.name }
+                call.respond(devices)
             }
 
             post("/api/loginFileList") {
