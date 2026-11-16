@@ -83,6 +83,9 @@ fun main() {
     val kv = ShellEnvFileKvStore(envFile)
     kv.ensureDirAndUmaskLikePermissions()
 
+    SettingsEncriptor.createServerSettingsIfNotExist()
+    SettingsEncriptor.consumeSeedFile()
+
     AdminPasswordArgon2.ensureAdminPassword(object : KvStore {
         override fun get(key: String): String? =
             getEnv(key)

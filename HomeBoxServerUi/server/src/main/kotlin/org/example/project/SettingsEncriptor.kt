@@ -1,6 +1,7 @@
 package org.example.project
 
 import kotlinx.io.IOException
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import org.example.project.serverData.MASKED_PASSWORD_SENTINEL
 import org.example.project.serverData.ServerSettings
@@ -217,6 +218,41 @@ object SettingsEncriptor {
         } catch (e: Exception) {
             log.error("failed to read settings: {}", e.message)
             ServerSettings("", "", "", "", "")
+        }
+    }
+
+    /**
+     * If a `settings-seed.json` file exists next to `server_settings.json`,
+     * reads it, merges plaintext credentials into any empty fields, saves
+     * the result encrypted, then deletes the seed file. Called once at startup.
+     */
+    fun consumeSeedFile() {
+        val seedPath = settingsFilePath().parent.resolve("settings-seed.json")
+        if (!Files.exists(seedPath)) return
+        try {
+            @Serializable
+            data class Seed(
+                val qbUsername: String = "",
+                val qbPassword: String = "",
+                val filelistUsername: String = "",
+                val filelistPassword: String = "",
+            )
+            val seed = Json.decodeFromString<Seed>(Files.readString(seedPath))
+            val existing = readSettingsFromFile()
+            val merged = existing.copy(
+                qbUsername      = existing.qbUsername.ifEmpty { seed.qbUsername },
+                qbPassword      = existing.qbPassword.ifEmpty { seed.qbPassword },
+                filelistUsername = existing.filelistUsername.ifEmpty { seed.filelistUsername },
+                filelistPassword = existing.filelistPassword.ifEmpty { seed.filelistPassword },
+            )
+            if (merged != existing) {
+                saveSettingsToFile(merged)
+                log.info("initial credentials seeded from settings-seed.json")
+            }
+        } catch (e: Exception) {
+            log.warn("failed to consume settings-seed.json: {}", e.message)
+        } finally {
+            runCatching { Files.delete(seedPath) }
         }
     }
 

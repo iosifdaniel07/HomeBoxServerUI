@@ -47,7 +47,11 @@ ssh -p $SSH_PORT $SERVER "mkdir -p /tmp/web-ui"
 scp -P $SSH_PORT -r composeApp/build/dist/wasmJs/productionExecutable/. $SERVER:/tmp/web-ui/
 ```
 
-### Step 3 — Run the installer (first time only)
+### Step 3 — Move web UI into place and run the installer (first time only)
+
+```bash
+ssh -t -p $SSH_PORT $SERVER "sudo mkdir -p /opt/homebox/web && sudo cp -r /tmp/web-ui/. /opt/homebox/web/"
+```
 
 ```bash
 ssh -p $SSH_PORT $SERVER

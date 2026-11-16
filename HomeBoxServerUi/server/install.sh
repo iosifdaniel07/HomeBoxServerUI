@@ -262,10 +262,11 @@ ensure_env_file() {
         return
     fi
     info "generating session + settings keys"
-    local session_enc session_sign settings_enc
+    local session_enc session_sign settings_enc admin_user
     session_enc="$(random_hex 16)"
     session_sign="$(random_hex 32)"
     settings_enc="$(random_hex 32)"
+    ask admin_user "Admin username" "admin"
 
     umask 077
     cat > "$ENV_FILE" <<EOF
@@ -277,7 +278,7 @@ SESSION_ENCRYPT_KEY_HEX=${session_enc}
 SESSION_SIGN_KEY_HEX=${session_sign}
 SETTINGS_ENC_KEY_HEX=${settings_enc}
 
-ADMIN_USERNAME=admin
+ADMIN_USERNAME=${admin_user}
 
 HOMEBOX_DOWNLOAD_FOLDER=${APP_DOWNLOADS}
 HOMEBOX_SETTINGS_FILE=${APP_HOME}/server_settings.json
@@ -456,6 +457,24 @@ install_qbittorrent() {
         write_qbittorrent_config "$qbt_pass"
         record_credential "qBittorrent WebUI user" "admin"
         record_credential "qBittorrent WebUI pass" "$qbt_pass"
+
+        # Ask for Filelist credentials to pre-seed HomeBox settings
+        local fl_user fl_pass
+        echo
+        info "Filelist credentials (optional — press Enter to skip)"
+        read -r -p "  $(printf "${C_BOLD}?${C_RESET}") Filelist username: " fl_user || fl_user=""
+        if [[ -n "$fl_user" ]]; then
+            read -r -s -p "  $(printf "${C_BOLD}?${C_RESET}") Filelist password: " fl_pass || fl_pass=""
+            echo
+        fi
+
+        # Write plaintext seed file — consumed + deleted by the JAR on first start
+        local seed_file="${APP_HOME}/settings-seed.json"
+        printf '{"qbUsername":"admin","qbPassword":"%s","filelistUsername":"%s","filelistPassword":"%s"}\n' \
+            "$qbt_pass" "${fl_user:-}" "${fl_pass:-}" > "$seed_file"
+        chown "$APP_USER":"$APP_GROUP" "$seed_file"
+        chmod 600 "$seed_file"
+        ok "credentials seed written — will be encrypted on first start"
     fi
 
     # systemd service — loopback only.
