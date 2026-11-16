@@ -7,6 +7,7 @@ import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.http.ContentType
 import io.ktor.http.contentType
 import io.ktor.serialization.kotlinx.json.*
+import kotlinx.serialization.json.Json
 import org.example.project.downloadData.TorrentInfo
 import org.example.project.searchData.FirstSearchResponse
 import org.example.project.searchData.SearchCompleteItem
@@ -25,7 +26,7 @@ import org.example.project.serverData.ServerSettingsClient
 object Client {
     val client = HttpClient {//(CIO) {
         install(ContentNegotiation) {
-            json()
+            json(Json { ignoreUnknownKeys = true })
         }
     }
 
