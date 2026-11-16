@@ -34,6 +34,7 @@ class FilelistClient {
     }
     var cachedValidator: String? = null
     var cookiesHeader: String? = null
+    private var sessionValid: Boolean = false
 
     val browseHeaders: HttpRequestBuilder.() -> Unit = {
         header(
@@ -115,27 +116,33 @@ class FilelistClient {
         return try {
             val validatorValue = getValidator(client)
             cachedValidator = validatorValue
-            if (validatorValue == null) return false
+            if (validatorValue == null) {
+                log.warn("filelist login: could not extract validator from login page")
+                return false
+            }
 
             val response = client.post("https://filelist.io/takelogin.php") {
                 loginHeaders()
                 setBody(FormDataContent(loginForm(validatorValue, username, password)))
             }
 
-            // NEVER log response.bodyAsText() / headers / cookies — contain
-            // session cookies and credentials.
-            log.debug("filelist login attempt status={}", response.status)
+            log.info("filelist login attempt status={}", response.status)
 
             cookiesHeader = extractCookies(client)
 
-            if (response.bodyAsText().contains("Invalid login attempt!!")) {
-                log.info("filelist login invalid credentials")
+            val body = response.bodyAsText()
+            if (body.contains("Invalid login attempt!!")) {
+                log.warn("filelist login: invalid credentials (wrong username or password)")
                 return false
             }
 
-            response.status == HttpStatusCode.Found
+            val success = response.status == HttpStatusCode.Found
+            if (!success) log.warn("filelist login: unexpected status={} (expected 302)", response.status)
+            sessionValid = success
+            success
         } catch (e: Exception) {
             log.error("filelist login error: {}", e.javaClass.simpleName)
+            sessionValid = false
             false
         }
     }
@@ -186,10 +193,21 @@ class FilelistClient {
     }
 
 
+    private suspend fun ensureLoggedIn(): Boolean {
+        if (sessionValid) return true
+        val settings = SettingsEncriptor.readSettingsFromFile()
+        if (settings.filelistUsername.isBlank() || settings.filelistPassword.isBlank()) {
+            log.warn("filelist credentials not configured")
+            return false
+        }
+        val ok = login(settings.filelistUsername, settings.filelistPassword)
+        if (!ok) log.warn("filelist login failed — check credentials in Settings")
+        return ok
+    }
+
     suspend fun firstSearch(): FirstSearchResponse {
         try {
-            val settings = SettingsEncriptor.readSettingsFromFile()
-            login(settings.filelistUsername, settings.filelistPassword)
+            if (!ensureLoggedIn()) return emptyFirstSearchResponse()
             val response = client.get("https://filelist.io/browse.php") {
                 browseHeaders()
             }
@@ -198,33 +216,34 @@ class FilelistClient {
             val searchItems = extractTorrentClasses(document)
             return FirstSearchResponse(extractSelectOptions(document), searchItems)
         } catch (e: Exception) {
-
+            log.error("filelist firstSearch error: {} {}", e.javaClass.simpleName, e.message)
         }
-        return FirstSearchResponse(
-            SearchFiltersData(
-                false,
-                listOf(),
-                listOf(),
-                listOf(),
-                null,
-                null,
-                null,
-                Pair(1, 1)
-            ), listOf()
-        )
+        return emptyFirstSearchResponse()
     }
+
+    private fun emptyFirstSearchResponse() = FirstSearchResponse(
+        SearchFiltersData(false, listOf(), listOf(), listOf(), null, null, null, Pair(1, 1)),
+        listOf()
+    )
 
     suspend fun search(searchItem: SearchCompleteItem): SearchResponse {
         try {
+            if (!ensureLoggedIn()) return SearchResponse(false, listOf(), Pair(1, 1))
             val response = client.get(createSearchUrl(searchItem)) {
                 browseHeaders()
             }
             log.debug("filelist search status={}", response.status)
-            val document = Jsoup.parse(response.bodyAsText())
+            val body = response.bodyAsText()
+            if (body.contains("login.php") || body.contains("Invalid login")) {
+                log.warn("filelist session expired, re-login on next request")
+                sessionValid = false
+            }
+            val document = Jsoup.parse(body)
             val searchItems = extractTorrentClasses(document)
             val pager = extractPageNumbers(document)
             return SearchResponse(true, searchItems, pager)
         } catch (e: Exception) {
+            log.error("filelist search error: {} {}", e.javaClass.simpleName, e.message)
             return SearchResponse(false, listOf(), Pair(1, 1))
         }
     }

@@ -35,6 +35,8 @@ APP_LOG_DIR="/var/log/homebox"
 SYSTEMD_UNIT="/etc/systemd/system/homebox.service"
 CADDYFILE="/etc/caddy/Caddyfile"
 
+MEDIA_GROUP="media"
+
 QBT_USER="qbittorrent"
 QBT_HOME="/var/lib/qbittorrent"
 QBT_DOWNLOADS="${APP_DOWNLOADS}"
@@ -414,6 +416,29 @@ ensure_admin_password() {
 }
 
 # ---------------------------------------------------------------------------
+# Shared media group — homebox + qbittorrent + plex all read/write downloads
+# ---------------------------------------------------------------------------
+setup_media_group() {
+    if ! getent group "$MEDIA_GROUP" >/dev/null; then
+        groupadd --system "$MEDIA_GROUP"
+        ok "created group '$MEDIA_GROUP'"
+    fi
+    for u in "$APP_USER" "$QBT_USER" plex; do
+        if getent passwd "$u" >/dev/null 2>&1; then
+            usermod -a -G "$MEDIA_GROUP" "$u" || true
+        fi
+    done
+    ok "users added to '$MEDIA_GROUP' group"
+}
+
+fix_media_permissions() {
+    chown -R :"$MEDIA_GROUP" "$APP_DOWNLOADS" 2>/dev/null || true
+    find "$APP_DOWNLOADS" -type d -exec chmod g+rwxs {} + 2>/dev/null || true
+    find "$APP_DOWNLOADS" -type f -exec chmod g+rw {} + 2>/dev/null || true
+    ok "fixed permissions on $APP_DOWNLOADS"
+}
+
+# ---------------------------------------------------------------------------
 # qBittorrent
 # ---------------------------------------------------------------------------
 install_qbittorrent() {
@@ -437,12 +462,9 @@ install_qbittorrent() {
         useradd --system --home-dir "$QBT_HOME" --shell /usr/sbin/nologin --create-home "$QBT_USER"
         ok "created system user '$QBT_USER'"
     fi
-    # Give qbittorrent write access to the shared downloads folder.
-    usermod -a -G "$APP_GROUP" "$QBT_USER" || true
+    setup_media_group
     install -d -o "$QBT_USER" -g "$QBT_USER" -m 0750 "$QBT_CONF_DIR"
     chown -R "$QBT_USER":"$QBT_USER" "$QBT_HOME"
-    # The downloads folder is shared with HomeBox — let the group write.
-    chmod g+w "$APP_DOWNLOADS"
 
     local qbt_pass
     if [[ -f "$CREDENTIALS_SUMMARY" ]] && grep -q "qBittorrent WebUI pass" "$CREDENTIALS_SUMMARY"; then
@@ -487,8 +509,8 @@ Wants=network-online.target
 [Service]
 Type=exec
 User=${QBT_USER}
-Group=${QBT_USER}
-UMask=0007
+Group=${MEDIA_GROUP}
+UMask=0002
 ExecStart=/usr/bin/qbittorrent-nox --webui-port=8080
 Restart=on-failure
 RestartSec=5
@@ -606,8 +628,9 @@ install_storage() {
         ok "mergerfs pool: $branches → $APP_DOWNLOADS"
     fi
     mount -a 2>/dev/null || true
-    chown "$APP_USER":"$APP_GROUP" "$APP_DOWNLOADS"
-    chmod 0750 "$APP_DOWNLOADS"
+    setup_media_group
+    chown "$APP_USER":"$MEDIA_GROUP" "$APP_DOWNLOADS"
+    chmod 2775 "$APP_DOWNLOADS"
     ok "downloads folder ready at $APP_DOWNLOADS"
 }
 
@@ -816,6 +839,7 @@ cmd_install_or_update() {
     install_plex
     install_caddy
     configure_ufw
+    fix_media_permissions
     start_service
     print_summary
 }
