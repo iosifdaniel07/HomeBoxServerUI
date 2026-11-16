@@ -25,15 +25,16 @@ object AdminPasswordArgon2 {
      * Dacă nu există ADMIN_PASSWORD_ARGON2ID, îl setează.
      * Returnează hash-ul stocat (existent sau nou generat).
      */
-    fun ensureAdminPassword(kv: KvStore, console: Console = System.console() ?: error(
-        "Nu am Console (System.console() == null). Rulează dintr-un terminal real, nu din IDE."
-    )): String {
+    fun ensureAdminPassword(kv: KvStore, console: Console? = System.console()): String {
         val existing = kv.get(KEY)
         if (!existing.isNullOrBlank()) return existing.trim()
 
-        console.writer().println("Set admin password (will be stored as Argon2id hash):")
-        val p1 = console.readPassword("Password: ") ?: error("Nu pot citi parola.")
-        val p2 = console.readPassword("Repeat: ") ?: error("Nu pot citi parola.")
+        val c = console ?: error(
+            "Nu am Console (System.console() == null). Rulează dintr-un terminal real, nu din IDE."
+        )
+        c.writer().println("Set admin password (will be stored as Argon2id hash):")
+        val p1 = c.readPassword("Password: ") ?: error("Nu pot citi parola.")
+        val p2 = c.readPassword("Repeat: ") ?: error("Nu pot citi parola.")
 
         if (!p1.contentEquals(p2)) {
             wipe(p1); wipe(p2)
