@@ -513,7 +513,7 @@ install_storage() {
     local idx=1
     while true; do
         local dev mp
-        ask dev "Device path to add (e.g. /dev/sdb1) — leave empty to finish"
+        read -r -p "  $(printf "${C_BOLD}?${C_RESET}") Device path to add (e.g. /dev/sdb1) — leave empty to finish: " dev || dev=""
         [[ -z "$dev" ]] && break
         [[ -b "$dev" ]] || { warn "$dev is not a block device — skipping"; continue; }
 
