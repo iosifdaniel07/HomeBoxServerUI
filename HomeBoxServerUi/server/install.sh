@@ -385,7 +385,7 @@ ensure_admin_password() {
             HOMEBOX_HOST="${HOMEBOX_HOST}" \
             HOMEBOX_PORT="${HOMEBOX_PORT}" \
             HOMEBOX_QBITTORRENT_URL="${HOMEBOX_QBITTORRENT_URL}" \
-        /usr/bin/java -jar "$APP_JAR" || true
+        /usr/bin/java -Duser.home="$APP_HOME" -jar "$APP_JAR" || true
 
     if [[ -f "$ADMIN_ENV_FILE" ]] && grep -q '^ADMIN_PASSWORD_ARGON2ID=' "$ADMIN_ENV_FILE"; then
         chmod 0640 "$ADMIN_ENV_FILE"
