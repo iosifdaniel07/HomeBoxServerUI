@@ -135,7 +135,7 @@ object SettingsEncriptor {
      */
     fun createServerSettingsIfNotExist() {
         val filePath = settingsFilePath()
-        val defaultSettings = ServerSettings("", "", "", "", "")
+        val defaultSettings = ServerSettings("", "", "", "", "", totpSecret = null)
         if (!Files.exists(filePath)) {
             Files.createDirectories(filePath.parent)
             Files.createFile(filePath)
@@ -175,6 +175,7 @@ object SettingsEncriptor {
             filelistPassword = if (s.filelistPassword.isNotEmpty()) MASKED_PASSWORD_SENTINEL else "",
             qbUsername = s.qbUsername,
             qbPassword = if (s.qbPassword.isNotEmpty()) MASKED_PASSWORD_SENTINEL else "",
+            totpEnabled = !s.totpSecret.isNullOrEmpty(),
         )
     }
 
@@ -207,19 +208,11 @@ object SettingsEncriptor {
         return try {
             val filePath = settingsFilePath()
             val jsonString = Files.readString(filePath)
-            // Deserialize the JSON string into a ServerSettings object
             val decoded = Json.decodeFromString<ServerSettings>(jsonString)
             decoded.copy(
-                filelistPassword =
-                    if (decoded.filelistPassword.isNotEmpty())
-                        decrypt(decoded.filelistPassword)
-                    else
-                        "",
-                qbPassword =
-                    if (decoded.qbPassword.isNotEmpty())
-                        decrypt(decoded.qbPassword)
-                    else
-                        ""
+                filelistPassword = if (decoded.filelistPassword.isNotEmpty()) decrypt(decoded.filelistPassword) else "",
+                qbPassword = if (decoded.qbPassword.isNotEmpty()) decrypt(decoded.qbPassword) else "",
+                totpSecret = decoded.totpSecret?.takeIf { it.isNotEmpty() }?.let { decrypt(it) },
             )
         } catch (e: Exception) {
             log.error("failed to read settings: {}", e.message)
@@ -229,13 +222,11 @@ object SettingsEncriptor {
 
     fun saveSettingsToFile(settings: ServerSettings): Boolean {
         try {
-            // Serialize the ServerSettings object into a JSON string
-            val qbP = settings.qbPassword
-            val filP = settings.filelistPassword
             val jsonString = Json.encodeToString(
                 settings.copy(
-                    qbPassword = encrypt(qbP).toString(),
-                    filelistPassword = encrypt(filP).toString()
+                    qbPassword = encrypt(settings.qbPassword),
+                    filelistPassword = encrypt(settings.filelistPassword),
+                    totpSecret = settings.totpSecret?.takeIf { it.isNotEmpty() }?.let { encrypt(it) },
                 )
             )
 

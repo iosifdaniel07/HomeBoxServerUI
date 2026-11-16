@@ -12,6 +12,8 @@ data class LoginRequest(
 data class LoginResponse(
     val isSuccess: Boolean,
     val csrfToken: String? = null,
+    val totpRequired: Boolean = false,
+    val pendingToken: String? = null,
 )
 
 @Serializable
@@ -20,3 +22,15 @@ data class MeResponse(
     val issuedAtMillis: Long,
     val csrfToken: String,
 )
+
+@Serializable
+data class TotpVerifyRequest(val pendingToken: String, val code: String)
+
+@Serializable
+data class TotpSetupResponse(val otpauthUri: String, val secret: String)
+
+@Serializable
+data class TotpEnableRequest(val secret: String, val code: String)
+
+@Serializable
+data class TotpDisableRequest(val code: String)

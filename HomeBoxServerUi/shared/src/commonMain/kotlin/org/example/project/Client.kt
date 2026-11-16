@@ -154,6 +154,34 @@ object Client {
         return resposne
     }
 
+    suspend fun verifyTotp(pendingToken: String, code: String): LoginResponse {
+        val response: LoginResponse = client.post("${host}/totp/verify") {
+            contentType(ContentType.Application.Json)
+            setBody(TotpVerifyRequest(pendingToken, code))
+        }.body()
+        if (response.isSuccess) csrfToken = response.csrfToken
+        return response
+    }
+
+    suspend fun setupTotp(): TotpSetupResponse =
+        client.get("${host}/totp/setup").body()
+
+    suspend fun enableTotp(secret: String, code: String): Boolean = try {
+        client.post("${host}/totp/enable") {
+            withCsrf()
+            contentType(ContentType.Application.Json)
+            setBody(TotpEnableRequest(secret, code))
+        }.status == io.ktor.http.HttpStatusCode.OK
+    } catch (_: Exception) { false }
+
+    suspend fun disableTotp(code: String): Boolean = try {
+        client.post("${host}/totp/disable") {
+            withCsrf()
+            contentType(ContentType.Application.Json)
+            setBody(TotpDisableRequest(code))
+        }.status == io.ktor.http.HttpStatusCode.OK
+    } catch (_: Exception) { false }
+
     // Clean up resources when done
     fun close() {
         client.close()

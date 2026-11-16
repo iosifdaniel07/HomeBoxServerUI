@@ -13,6 +13,7 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.foundation.text.selection.SelectionContainer
 import kotlinx.coroutines.launch
 import org.example.project.serverData.ServerSettingsClient
 
@@ -31,6 +32,13 @@ fun ServerSettingsScreen(
     var saving by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
 
+    // 2FA state
+    var totpEnabled by remember { mutableStateOf(false) }
+    var totpSetupUri by remember { mutableStateOf<String?>(null) }
+    var totpSetupSecret by remember { mutableStateOf<String?>(null) }
+    var totpCode by remember { mutableStateOf("") }
+    var totpStatus by remember { mutableStateOf<String?>(null) }
+
     val client = Client
     val scope = rememberCoroutineScope()
 
@@ -40,6 +48,7 @@ fun ServerSettingsScreen(
         filelistPass = settingsData?.filelistPassword
         qbUser = settingsData?.qbUsername
         qbPass = settingsData?.qbPassword
+        totpEnabled = settingsData?.totpEnabled ?: false
     }
 
     Scaffold { padding ->
@@ -112,6 +121,107 @@ fun ServerSettingsScreen(
                 item {
                     error?.let {
                         Text(it, color = MaterialTheme.colorScheme.error)
+                    }
+                }
+
+                // ---- 2FA section ----
+                item {
+                    Spacer(Modifier.height(8.dp))
+                    Text("Two-Factor Authentication (2FA)", style = MaterialTheme.typography.titleMedium)
+                }
+
+                item {
+                    Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                        Text(if (totpEnabled) "Status: Enabled" else "Status: Disabled")
+                        Spacer(Modifier.width(12.dp))
+                        if (!totpEnabled) {
+                            Button(onClick = {
+                                totpStatus = null; totpCode = ""
+                                scope.launch {
+                                    val setup = client.setupTotp()
+                                    totpSetupSecret = setup.secret
+                                    totpSetupUri = setup.otpauthUri
+                                }
+                            }) { Text("Setup 2FA") }
+                        } else {
+                            Button(
+                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+                                onClick = { totpSetupUri = null; totpSetupSecret = null; totpCode = ""; totpStatus = null }
+                            ) { Text("Disable 2FA") }
+                        }
+                    }
+                }
+
+                if (totpSetupSecret != null && !totpEnabled) {
+                    item {
+                        Card(modifier = Modifier.fillMaxWidth()) {
+                            Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Text("1. Open your authenticator app (Google Authenticator, Authy…) and scan the QR code or enter the key manually:", style = MaterialTheme.typography.bodySmall)
+                                SelectionContainer { Text(totpSetupSecret!!, style = MaterialTheme.typography.bodyMedium) }
+                                Text("2. Enter the 6-digit code shown in your app to confirm:", style = MaterialTheme.typography.bodySmall)
+                                OutlinedTextField(
+                                    value = totpCode,
+                                    onValueChange = { if (it.length <= 6 && it.all { c -> c.isDigit() }) totpCode = it },
+                                    label = { Text("6-digit code") },
+                                    singleLine = true,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                                totpStatus?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+                                Button(
+                                    enabled = totpCode.length == 6,
+                                    onClick = {
+                                        scope.launch {
+                                            val ok = client.enableTotp(totpSetupSecret!!, totpCode)
+                                            if (ok) {
+                                                totpEnabled = true
+                                                totpSetupSecret = null
+                                                totpSetupUri = null
+                                                totpCode = ""
+                                                totpStatus = null
+                                            } else {
+                                                totpStatus = "Invalid code — try again"
+                                                totpCode = ""
+                                            }
+                                        }
+                                    }
+                                ) { Text("Enable 2FA") }
+                            }
+                        }
+                    }
+                }
+
+                if (totpEnabled && totpSetupSecret == null) {
+                    item {
+                        Card(modifier = Modifier.fillMaxWidth()) {
+                            Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Text("Enter your current 6-digit code to disable 2FA:", style = MaterialTheme.typography.bodySmall)
+                                OutlinedTextField(
+                                    value = totpCode,
+                                    onValueChange = { if (it.length <= 6 && it.all { c -> c.isDigit() }) totpCode = it },
+                                    label = { Text("6-digit code") },
+                                    singleLine = true,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                                totpStatus?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+                                Button(
+                                    enabled = totpCode.length == 6,
+                                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+                                    onClick = {
+                                        scope.launch {
+                                            val ok = client.disableTotp(totpCode)
+                                            if (ok) {
+                                                totpEnabled = false
+                                                totpCode = ""
+                                                totpStatus = null
+                                            } else {
+                                                totpStatus = "Invalid code — try again"
+                                                totpCode = ""
+                                            }
+                                        }
+                                    }
+                                ) { Text("Confirm Disable") }
+                            }
+                        }
                     }
                 }
 

@@ -12,7 +12,8 @@ data class ServerSettings(
     val filelistUsername: String,
     val filelistPassword: String,
     val qbUsername: String,
-    val qbPassword: String
+    val qbPassword: String,
+    val totpSecret: String? = null,
 )
 
 /**
@@ -23,13 +24,16 @@ data class ServerSettings(
  *  - empty string — unset
  *  - [MASKED_PASSWORD_SENTINEL] — set on the server but hidden from client
  *  - any other value — new password (will replace existing)
+ *
+ * `totpEnabled` is read-only from the client — 2FA is managed via the totp endpoints.
  */
 @Serializable
 data class ServerSettingsClient(
     val filelistUsername: String,
     val filelistPassword: String,
     val qbUsername: String,
-    val qbPassword: String
+    val qbPassword: String,
+    val totpEnabled: Boolean = false,
 )
 
 /** Shared sentinel for masked passwords. Kept in shared so UI code can detect it. */

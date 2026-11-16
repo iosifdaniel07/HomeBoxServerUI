@@ -38,6 +38,10 @@ import io.ktor.util.hex
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.example.project.AdminPasswordArgon2.ADMIN_USERNAME
+import org.example.project.TotpDisableRequest
+import org.example.project.TotpEnableRequest
+import org.example.project.TotpSetupResponse
+import org.example.project.TotpVerifyRequest
 import org.example.project.searchData.SearchCompleteItem
 import org.example.project.serverData.DeleteItem
 import org.example.project.serverData.DeleteResponse
@@ -202,6 +206,26 @@ fun Application.module() {
                 else -> ValidationResult.Valid
             }
         }
+        validate<TotpVerifyRequest> { r ->
+            when {
+                r.pendingToken.isBlank() -> ValidationResult.Invalid("pendingToken required")
+                r.code.length != 6 || !r.code.all { it.isDigit() } -> ValidationResult.Invalid("code must be 6 digits")
+                else -> ValidationResult.Valid
+            }
+        }
+        validate<TotpEnableRequest> { r ->
+            when {
+                r.secret.isBlank() || r.secret.length > 64 -> ValidationResult.Invalid("invalid secret")
+                r.code.length != 6 || !r.code.all { it.isDigit() } -> ValidationResult.Invalid("code must be 6 digits")
+                else -> ValidationResult.Valid
+            }
+        }
+        validate<TotpDisableRequest> { r ->
+            when {
+                r.code.length != 6 || !r.code.all { it.isDigit() } -> ValidationResult.Invalid("code must be 6 digits")
+                else -> ValidationResult.Valid
+            }
+        }
     }
 
     val encryptKeyHex = requireEnv(SESSION_ENCRYPT_KEY_HEX)
@@ -252,7 +276,7 @@ fun Application.module() {
         val path = call.request.path()
         val method = call.request.httpMethod
         // Public endpoints and read-only methods are exempt.
-        if (path == "/api/get" || path == "/api/login") return@intercept
+        if (path == "/api/get" || path == "/api/login" || path == "/api/totp/verify") return@intercept
         if (method == HttpMethod.Get || method == HttpMethod.Head || method == HttpMethod.Options) {
             return@intercept
         }
@@ -291,26 +315,62 @@ fun Application.module() {
                 val req = call.receive<LoginRequest>()
                 val ip = call.request.local.remoteHost
                 if (verifyAdminCredentials(req.username, req.password)) {
-                    val sessionId = UUID.randomUUID().toString()
-                    val csrfToken = newCsrfToken()
-                    SessionRegistry.register(sessionId)
-                    call.sessions.set(
-                        AdminSession(
-                            user = req.username,
-                            sessionId = sessionId,
-                            issuedAtMillis = System.currentTimeMillis(),
-                            csrfToken = csrfToken,
+                    val settings = SettingsEncriptor.readSettingsFromFile()
+                    if (!settings.totpSecret.isNullOrEmpty()) {
+                        val pendingToken = PendingTotpRegistry.create(req.username)
+                        AuditLog.record(who = req.username, ip = ip, action = "login", result = "totp-required")
+                        call.respond(LoginResponse(isSuccess = false, totpRequired = true, pendingToken = pendingToken))
+                    } else {
+                        val sessionId = UUID.randomUUID().toString()
+                        val csrfToken = newCsrfToken()
+                        SessionRegistry.register(sessionId)
+                        call.sessions.set(
+                            AdminSession(
+                                user = req.username,
+                                sessionId = sessionId,
+                                issuedAtMillis = System.currentTimeMillis(),
+                                csrfToken = csrfToken,
+                            )
                         )
-                    )
-                    AuditLog.record(who = req.username, ip = ip, action = "login", result = "ok")
-                    call.respond(LoginResponse(true, csrfToken))
+                        AuditLog.record(who = req.username, ip = ip, action = "login", result = "ok")
+                        call.respond(LoginResponse(true, csrfToken))
+                    }
                 } else {
                     AuditLog.record(who = req.username, ip = ip, action = "login", result = "fail")
-                    // Extra artificial delay on failed login to slow brute force
-                    // on top of Argon2's inherent cost and the per-IP rate limit.
                     kotlinx.coroutines.delay(500)
                     call.respond(LoginResponse(false))
                 }
+            }
+
+            post("/api/totp/verify") {
+                val req = call.receive<TotpVerifyRequest>()
+                val ip = call.request.local.remoteHost
+                val username = PendingTotpRegistry.consume(req.pendingToken)
+                if (username == null) {
+                    kotlinx.coroutines.delay(500)
+                    call.respond(LoginResponse(false))
+                    return@post
+                }
+                val secret = SettingsEncriptor.readSettingsFromFile().totpSecret
+                if (secret.isNullOrEmpty() || !TotpManager.verify(secret, req.code)) {
+                    AuditLog.record(who = username, ip = ip, action = "totp-verify", result = "fail")
+                    kotlinx.coroutines.delay(500)
+                    call.respond(LoginResponse(false))
+                    return@post
+                }
+                val sessionId = UUID.randomUUID().toString()
+                val csrfToken = newCsrfToken()
+                SessionRegistry.register(sessionId)
+                call.sessions.set(
+                    AdminSession(
+                        user = username,
+                        sessionId = sessionId,
+                        issuedAtMillis = System.currentTimeMillis(),
+                        csrfToken = csrfToken,
+                    )
+                )
+                AuditLog.record(who = username, ip = ip, action = "totp-verify", result = "ok")
+                call.respond(LoginResponse(true, csrfToken))
             }
         }
 
@@ -344,6 +404,42 @@ fun Application.module() {
                     call.sessions.set(refreshed)
                     call.respond(MeResponse(principal.name, refreshed.issuedAtMillis, refreshed.csrfToken))
                 }
+            }
+
+            get("/api/totp/setup") {
+                val secret = TotpManager.generateSecretBase32()
+                call.respond(TotpSetupResponse(TotpManager.buildOtpauthUri(secret), secret))
+            }
+
+            post("/api/totp/enable") {
+                val req = call.receive<TotpEnableRequest>()
+                val who = call.principal<UserIdPrincipal>()?.name
+                val ip = call.request.local.remoteHost
+                if (!TotpManager.verify(req.secret, req.code)) {
+                    AuditLog.record(who, ip, "totp-enable", result = "fail")
+                    call.respond(HttpStatusCode.BadRequest, ErrorResponse("invalid code"))
+                    return@post
+                }
+                val existing = SettingsEncriptor.readSettingsFromFile()
+                SettingsEncriptor.saveSettingsToFile(existing.copy(totpSecret = req.secret))
+                AuditLog.record(who, ip, "totp-enable", result = "ok")
+                call.respond(HttpStatusCode.OK)
+            }
+
+            post("/api/totp/disable") {
+                val req = call.receive<TotpDisableRequest>()
+                val who = call.principal<UserIdPrincipal>()?.name
+                val ip = call.request.local.remoteHost
+                val secret = SettingsEncriptor.readSettingsFromFile().totpSecret
+                if (secret.isNullOrEmpty() || !TotpManager.verify(secret, req.code)) {
+                    AuditLog.record(who, ip, "totp-disable", result = "fail")
+                    call.respond(HttpStatusCode.BadRequest, ErrorResponse("invalid code"))
+                    return@post
+                }
+                val existing = SettingsEncriptor.readSettingsFromFile()
+                SettingsEncriptor.saveSettingsToFile(existing.copy(totpSecret = null))
+                AuditLog.record(who, ip, "totp-disable", result = "ok")
+                call.respond(HttpStatusCode.OK)
             }
 
             post("/api/loginFileList") {
@@ -492,6 +588,31 @@ private val csrfRng = java.security.SecureRandom()
 private fun newCsrfToken(): String {
     val bytes = ByteArray(32).also { csrfRng.nextBytes(it) }
     return java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(bytes)
+}
+
+private object PendingTotpRegistry {
+    private val ttlMs = 5L * 60 * 1000
+    private val map = java.util.concurrent.ConcurrentHashMap<String, Pair<String, Long>>()
+    private val rng = java.security.SecureRandom()
+
+    fun create(username: String): String {
+        prune()
+        val token = java.util.Base64.getUrlEncoder().withoutPadding()
+            .encodeToString(ByteArray(24).also { rng.nextBytes(it) })
+        map[token] = username to System.currentTimeMillis()
+        return token
+    }
+
+    fun consume(token: String): String? {
+        prune()
+        val (user, ts) = map.remove(token) ?: return null
+        return if (System.currentTimeMillis() - ts <= ttlMs) user else null
+    }
+
+    private fun prune() {
+        val cutoff = System.currentTimeMillis() - ttlMs
+        map.entries.removeIf { it.value.second < cutoff }
+    }
 }
 
 /** Length-independent, constant-time string comparison for secrets. */

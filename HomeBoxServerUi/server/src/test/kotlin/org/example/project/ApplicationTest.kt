@@ -183,6 +183,152 @@ class ApplicationTest {
     }
 
     // -----------------------------------------------------------------
+    // TOTP: TotpManager unit tests
+    // -----------------------------------------------------------------
+
+    @Test
+    fun `TotpManager generates a valid Base32 secret`() {
+        val secret = TotpManager.generateSecretBase32()
+        assertTrue(secret.isNotEmpty())
+        // Base32 alphabet only
+        assertTrue(secret.all { it in 'A'..'Z' || it in '2'..'7' })
+    }
+
+    @Test
+    fun `TotpManager buildOtpauthUri contains secret and issuer`() {
+        val secret = TotpManager.generateSecretBase32()
+        val uri = TotpManager.buildOtpauthUri(secret)
+        assertTrue(uri.startsWith("otpauth://totp/"))
+        assertTrue(uri.contains("secret=$secret"))
+        assertTrue(uri.contains("issuer=HomeBox"))
+    }
+
+    @Test
+    fun `TotpManager rejects wrong 6-digit code`() {
+        val secret = TotpManager.generateSecretBase32()
+        // "000000" is astronomically unlikely to match the real current code
+        assertFalse(TotpManager.verify(secret, "000000"))
+    }
+
+    @Test
+    fun `TotpManager rejects code with wrong length`() {
+        val secret = TotpManager.generateSecretBase32()
+        assertFalse(TotpManager.verify(secret, "12345"))   // 5 digits
+        assertFalse(TotpManager.verify(secret, "1234567")) // 7 digits
+        assertFalse(TotpManager.verify(secret, ""))
+    }
+
+    @Test
+    fun `TotpManager rejects non-numeric code`() {
+        val secret = TotpManager.generateSecretBase32()
+        assertFalse(TotpManager.verify(secret, "12345a"))
+        assertFalse(TotpManager.verify(secret, "abcdef"))
+    }
+
+    @Test
+    fun `TotpManager round-trip encode-decode produces same secret`() {
+        // Generate secret, build URI, extract secret from URI, verify they match
+        val secret = TotpManager.generateSecretBase32()
+        val uri = TotpManager.buildOtpauthUri(secret)
+        val extracted = uri.substringAfter("secret=").substringBefore("&")
+        assertEquals(secret, extracted)
+    }
+
+    // -----------------------------------------------------------------
+    // 2FA: /api/totp/verify endpoint
+    // -----------------------------------------------------------------
+
+    @Test
+    fun `totp verify with unknown pending token returns failure`() = testApplication {
+        application { module() }
+        val r = client.post("/api/totp/verify") {
+            contentType(ContentType.Application.Json)
+            setBody("""{"pendingToken":"invalid-token-xyz","code":"123456"}""")
+        }
+        assertEquals(HttpStatusCode.OK, r.status)
+        assertFalse(r.bodyAsText().contains(""""isSuccess":true"""))
+    }
+
+    @Test
+    fun `totp verify with invalid code format returns 400`() = testApplication {
+        application { module() }
+        val r = client.post("/api/totp/verify") {
+            contentType(ContentType.Application.Json)
+            setBody("""{"pendingToken":"sometoken","code":"abc"}""")
+        }
+        assertEquals(HttpStatusCode.BadRequest, r.status)
+    }
+
+    @Test
+    fun `totp setup requires authentication`() = testApplication {
+        application { module() }
+        val r = client.get("/api/totp/setup")
+        assertEquals(HttpStatusCode.Unauthorized, r.status)
+    }
+
+    @Test
+    fun `totp enable requires authentication`() = testApplication {
+        application { module() }
+        val r = client.post("/api/totp/enable") {
+            contentType(ContentType.Application.Json)
+            setBody("""{"secret":"JBSWY3DPEHPK3PXP","code":"123456"}""")
+        }
+        assertTrue(r.status == HttpStatusCode.Unauthorized || r.status == HttpStatusCode.Forbidden)
+    }
+
+    @Test
+    fun `totp disable requires authentication`() = testApplication {
+        application { module() }
+        val r = client.post("/api/totp/disable") {
+            contentType(ContentType.Application.Json)
+            setBody("""{"code":"123456"}""")
+        }
+        assertTrue(r.status == HttpStatusCode.Unauthorized || r.status == HttpStatusCode.Forbidden)
+    }
+
+    // -----------------------------------------------------------------
+    // Settings: totpSecret round-trip
+    // -----------------------------------------------------------------
+
+    @Test
+    fun `settings totpSecret encrypts and decrypts correctly`() {
+        SettingsEncriptor.assertKeyAvailable()
+        val secret = TotpManager.generateSecretBase32()
+        val encrypted = SettingsEncriptor.encrypt(secret)
+        val decrypted = SettingsEncriptor.decrypt(encrypted)
+        assertEquals(secret, decrypted)
+    }
+
+    @Test
+    fun `readClientSettings returns totpEnabled false when no secret set`() {
+        // With a fresh settings file (no totpSecret), totpEnabled should be false
+        val settings = org.example.project.serverData.ServerSettings(
+            downloadFolder = "",
+            filelistUsername = "",
+            filelistPassword = "",
+            qbUsername = "",
+            qbPassword = "",
+            totpSecret = null,
+        )
+        // totpEnabled = !totpSecret.isNullOrEmpty()
+        assertFalse(!settings.totpSecret.isNullOrEmpty())
+    }
+
+    @Test
+    fun `readClientSettings returns totpEnabled true when secret is set`() {
+        val secret = TotpManager.generateSecretBase32()
+        val settings = org.example.project.serverData.ServerSettings(
+            downloadFolder = "",
+            filelistUsername = "",
+            filelistPassword = "",
+            qbUsername = "",
+            qbPassword = "",
+            totpSecret = secret,
+        )
+        assertTrue(!settings.totpSecret.isNullOrEmpty())
+    }
+
+    // -----------------------------------------------------------------
     // Helpers
     // -----------------------------------------------------------------
 

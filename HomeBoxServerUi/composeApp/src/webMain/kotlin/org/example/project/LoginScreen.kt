@@ -20,9 +20,10 @@ import org.jetbrains.compose.resources.painterResource
 fun LoginScreen(onLogin: (String, String) -> Unit) {
     var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
-    var error by remember { mutableStateOf<String?>(null) }
-    var status by remember { mutableStateOf<String?>(null) }   // ← UI feedback
-    val scope = rememberCoroutineScope()                        // ← prefer this over MainScope()
+    var totpCode by remember { mutableStateOf("") }
+    var pendingToken by remember { mutableStateOf<String?>(null) }
+    var status by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
     val client = Client
 
     Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
@@ -35,66 +36,100 @@ fun LoginScreen(onLogin: (String, String) -> Unit) {
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-
             Image(
                 painter = painterResource(Res.drawable.myhomeBox),
                 contentDescription = "My Home Box Logo",
                 modifier = Modifier.size(240.dp)
             )
 
-            Text("Login", style = MaterialTheme.typography.headlineMedium)
-            Spacer(Modifier.height(16.dp))
+            if (pendingToken == null) {
+                Text("Login", style = MaterialTheme.typography.headlineMedium)
+                Spacer(Modifier.height(16.dp))
 
-            OutlinedTextField(
-                value = username,
-                onValueChange = { username = it },
-                label = { Text("Username") },
-                modifier = Modifier.fillMaxWidth(),
-            )
-
-            Spacer(Modifier.height(8.dp))
-
-            OutlinedTextField(
-                value = password,
-                onValueChange = { password = it },
-                label = { Text("Password") },
-                modifier = Modifier.fillMaxWidth(),
-                visualTransformation = PasswordVisualTransformation()
-            )
-
-            Spacer(Modifier.height(16.dp))
-
-            Button(
-                onClick = {
-                    if (username.isBlank() || password.isBlank()) {
-                        error = "Please fill in all fields"
-                        status = null
-                    } else {
-                        error = null
-                        status = "Logging in…"
-                        scope.launch {
-                            print("start loggin")
-                            val response = client.login(username, password).isSuccess
-                            print("end loggin ${response}")
-                            if(response){
-                                onLogin(username, password)
-                            } else {
-                                status = "Login failed"
+                OutlinedTextField(
+                    value = username,
+                    onValueChange = { username = it },
+                    label = { Text("Username") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = password,
+                    onValueChange = { password = it },
+                    label = { Text("Password") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    visualTransformation = PasswordVisualTransformation()
+                )
+                Spacer(Modifier.height(16.dp))
+                Button(
+                    onClick = {
+                        if (username.isBlank() || password.isBlank()) {
+                            status = "Please fill in all fields"
+                        } else {
+                            status = "Logging in…"
+                            scope.launch {
+                                val response = client.login(username, password)
+                                when {
+                                    response.isSuccess -> onLogin(username, password)
+                                    response.totpRequired -> {
+                                        pendingToken = response.pendingToken
+                                        status = null
+                                    }
+                                    else -> status = "Login failed"
+                                }
                             }
                         }
-                    }
-                },
-                modifier = Modifier.fillMaxWidth()
-            ) { Text("Login") }
-
-            error?.let {
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) { Text("Login") }
+            } else {
+                Text("Two-Factor Authentication", style = MaterialTheme.typography.headlineMedium)
                 Spacer(Modifier.height(8.dp))
-                Text(it, color = Color.Red)
+                Text(
+                    "Enter the 6-digit code from your authenticator app.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.height(16.dp))
+                OutlinedTextField(
+                    value = totpCode,
+                    onValueChange = { if (it.length <= 6 && it.all { c -> c.isDigit() }) totpCode = it },
+                    label = { Text("6-digit code") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(Modifier.height(16.dp))
+                Button(
+                    onClick = {
+                        if (totpCode.length != 6) {
+                            status = "Enter a 6-digit code"
+                        } else {
+                            status = "Verifying…"
+                            scope.launch {
+                                val response = client.verifyTotp(pendingToken!!, totpCode)
+                                if (response.isSuccess) {
+                                    onLogin(username, password)
+                                } else {
+                                    status = "Invalid code — try again"
+                                    totpCode = ""
+                                }
+                            }
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) { Text("Verify") }
+
+                Spacer(Modifier.height(8.dp))
+                TextButton(onClick = { pendingToken = null; totpCode = ""; status = null }) {
+                    Text("Back to login")
+                }
             }
 
             status?.let {
                 Spacer(Modifier.height(12.dp))
-                Text(it, color = if (it.startsWith("Login success")) Color(0xFF2E7D32) else Color(0xFFB00020))
+                Text(it, color = Color(0xFFB00020))
             }
         }
     }
