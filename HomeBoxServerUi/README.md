@@ -61,17 +61,20 @@ sudo bash /tmp/install.sh install
 ### Step 4 — Update (without full reinstall)
 
 ```bash
-# Update backend JAR only
-scp -P $SSH_PORT server/build/libs/server-all.jar $SERVER:/tmp/
-ssh -t -p $SSH_PORT $SERVER \
-  "sudo systemctl stop homebox && \
-   sudo cp /tmp/server-all.jar /opt/homebox/server.jar && \
-   sudo systemctl start homebox"
+# Rebuild everything
+JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64 ./gradlew :server:shadowJar :composeApp:wasmJsBrowserDistribution
 
-# Update web UI only
+# Copy to server
+scp -P $SSH_PORT server/build/libs/server-all.jar $SERVER:/tmp/
 ssh -p $SSH_PORT $SERVER "mkdir -p /tmp/web-ui"
 scp -P $SSH_PORT -r composeApp/build/dist/wasmJs/productionExecutable/. $SERVER:/tmp/web-ui/
-ssh -t -p $SSH_PORT $SERVER "sudo cp -r /tmp/web-ui/. /opt/homebox/web/"
+
+# Deploy and restart (run on server)
+ssh -p $SSH_PORT $SERVER \
+  "sudo systemctl stop homebox && \
+   sudo cp /tmp/server-all.jar /opt/homebox/server.jar && \
+   sudo cp -r /tmp/web-ui/. /opt/homebox/web/ && \
+   sudo systemctl start homebox"
 ```
 
 The wizard asks you, in order:
@@ -212,9 +215,9 @@ auth guards, and settings totpSecret round-trip.
 ### Service status
 
 ```bash
-systemctl status homebox.service
-systemctl status qbittorrent-nox.service
-systemctl status caddy.service
+sudo systemctl status homebox --no-pager
+sudo systemctl status qbittorrent-nox --no-pager
+sudo systemctl status caddy --no-pager
 ```
 
 ### Logs

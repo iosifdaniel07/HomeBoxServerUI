@@ -31,6 +31,7 @@ fun ServerSettingsScreen(
 
     var saving by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
+    var loadError by remember { mutableStateOf<String?>(null) }
 
     // 2FA state
     var totpDeviceNames by remember { mutableStateOf<List<String>>(emptyList()) }
@@ -47,12 +48,16 @@ fun ServerSettingsScreen(
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {
-        settingsData = client.getServerSettins()
-        filelistUser = settingsData?.filelistUsername
-        filelistPass = settingsData?.filelistPassword
-        qbUser = settingsData?.qbUsername
-        qbPass = settingsData?.qbPassword
-        totpDeviceNames = settingsData?.totpDeviceNames ?: emptyList()
+        try {
+            settingsData = client.getServerSettins()
+            filelistUser = settingsData?.filelistUsername
+            filelistPass = settingsData?.filelistPassword
+            qbUser = settingsData?.qbUsername
+            qbPass = settingsData?.qbPassword
+            totpDeviceNames = settingsData?.totpDeviceNames ?: emptyList()
+        } catch (e: Exception) {
+            loadError = "Failed to load settings: ${e.message}"
+        }
     }
 
     Scaffold { padding ->
@@ -66,6 +71,10 @@ fun ServerSettingsScreen(
                 modifier = Modifier.fillMaxSize()
             ) {
                 item { TopBar(Screen.SERVER_SETTINGS, onMenuSelected) }
+
+                loadError?.let {
+                    item { Text(it, color = MaterialTheme.colorScheme.error) }
+                }
 
                 item {
                     Text(
@@ -141,9 +150,13 @@ fun ServerSettingsScreen(
                         Button(onClick = {
                             totpStatus = null; totpCode = ""; totpDeviceName = "My Phone"
                             scope.launch {
-                                val setup = client.setupTotp()
-                                totpSetupSecret = setup.secret
-                                totpSetupUri = setup.otpauthUri
+                                try {
+                                    val setup = client.setupTotp()
+                                    totpSetupSecret = setup.secret
+                                    totpSetupUri = setup.otpauthUri
+                                } catch (e: Exception) {
+                                    totpStatus = "Error: ${e.message}"
+                                }
                             }
                         }) { Text("Add device") }
                     }
@@ -267,8 +280,8 @@ fun ServerSettingsScreen(
                             onClick = {
                                 error = null
                                 saving = true
-                                try {
-                                    scope.launch {
+                                scope.launch {
+                                    try {
                                         client.saveServerSettings(
                                             ServerSettingsClient(
                                                 filelistUsername = filelistUser?.trim().orEmpty(),
@@ -277,9 +290,11 @@ fun ServerSettingsScreen(
                                                 qbPassword = qbPass.orEmpty()
                                             )
                                         )
+                                    } catch (e: Exception) {
+                                        error = "Save failed: ${e.message}"
+                                    } finally {
+                                        saving = false
                                     }
-                                } finally {
-                                    saving = false
                                 }
                             }
                         ) {
