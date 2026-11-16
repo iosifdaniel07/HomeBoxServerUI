@@ -642,6 +642,7 @@ install_caddy() {
                 apt-get install -y debian-keyring debian-archive-keyring apt-transport-https curl gpg >/dev/null
                 curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' \
                     | gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+                chmod 644 /usr/share/keyrings/caddy-stable-archive-keyring.gpg
                 curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' \
                     | tee /etc/apt/sources.list.d/caddy-stable.list >/dev/null
                 apt-get update -y >/dev/null
