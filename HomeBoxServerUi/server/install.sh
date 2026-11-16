@@ -496,6 +496,122 @@ EOF
 }
 
 # ---------------------------------------------------------------------------
+# Storage — mount additional disks and pool them under APP_DOWNLOADS
+# ---------------------------------------------------------------------------
+install_storage() {
+    step "Storage (additional disks)"
+    if ! ask_yes_no "Mount additional disks into the downloads folder?" n; then
+        info "using default: ${APP_DOWNLOADS}"
+        return
+    fi
+
+    info "Available block devices:"
+    lsblk -o NAME,SIZE,TYPE,FSTYPE,MOUNTPOINT 2>/dev/null | grep -v loop | sed 's/^/   /'
+    echo
+
+    local disks=()
+    local idx=1
+    while true; do
+        local dev mp
+        ask dev "Device path to add (e.g. /dev/sdb1) — leave empty to finish"
+        [[ -z "$dev" ]] && break
+        [[ -b "$dev" ]] || { warn "$dev is not a block device — skipping"; continue; }
+
+        mp="/mnt/disk${idx}"
+        mkdir -p "$mp"
+
+        local uuid fstype
+        uuid="$(blkid -s UUID -o value "$dev" 2>/dev/null || true)"
+        fstype="$(blkid -s TYPE -o value "$dev" 2>/dev/null || echo ext4)"
+
+        if [[ -z "$uuid" ]]; then
+            warn "Cannot read UUID from $dev — skipping (is it formatted?)"
+            continue
+        fi
+
+        if ! grep -q "UUID=$uuid" /etc/fstab; then
+            printf 'UUID=%s\t%s\t%s\tdefaults,nofail\t0\t2\n' "$uuid" "$mp" "$fstype" >> /etc/fstab
+            ok "added $dev (UUID=$uuid) → $mp in /etc/fstab"
+        else
+            ok "$dev already in /etc/fstab"
+        fi
+        mount "$mp" 2>/dev/null || mount -a 2>/dev/null || true
+        disks+=("$mp")
+        ((idx++))
+    done
+
+    if [[ ${#disks[@]} -eq 0 ]]; then
+        info "no disks added"
+        return
+    fi
+
+    # Install mergerfs to pool all disks into APP_DOWNLOADS.
+    if ! command -v mergerfs >/dev/null 2>&1; then
+        info "installing mergerfs"
+        case "$(detect_pkg_mgr)" in
+            apt) DEBIAN_FRONTEND=noninteractive apt-get install -y mergerfs >/dev/null ;;
+            dnf) dnf install -y mergerfs >/dev/null ;;
+        esac
+    fi
+
+    local branches
+    branches="$(IFS=:; echo "${disks[*]}")"
+    if ! grep -q "mergerfs" /etc/fstab; then
+        printf '%s\t%s\tfuse.mergerfs\tdefaults,allow_other,use_ino,category.create=mfs,nofail\t0\t0\n' \
+            "$branches" "$APP_DOWNLOADS" >> /etc/fstab
+        ok "mergerfs pool: $branches → $APP_DOWNLOADS"
+    fi
+    mount -a 2>/dev/null || true
+    chown "$APP_USER":"$APP_GROUP" "$APP_DOWNLOADS"
+    chmod 0750 "$APP_DOWNLOADS"
+    ok "downloads folder ready at $APP_DOWNLOADS"
+}
+
+# ---------------------------------------------------------------------------
+# Plex Media Server
+# ---------------------------------------------------------------------------
+install_plex() {
+    step "Plex Media Server"
+    if ! ask_yes_no "Install Plex Media Server?" n; then
+        info "skipped"
+        return
+    fi
+
+    if systemctl is-active --quiet plexmediaserver 2>/dev/null; then
+        ok "Plex already running — skipping install"
+        return
+    fi
+
+    info "fetching latest Plex version from plex.tv..."
+    local url
+    url="$(curl -sL 'https://plex.tv/api/downloads/5.json' | grep -oE 'https://[^"]+amd64\.deb' | head -1 || true)"
+    [[ -n "$url" ]] || die "could not determine Plex download URL — check internet connectivity"
+
+    info "downloading Plex (~150 MB)..."
+    wget -q "$url" -O /tmp/plexmediaserver.deb || die "failed to download Plex"
+
+    info "installing Plex..."
+    DEBIAN_FRONTEND=noninteractive dpkg -i /tmp/plexmediaserver.deb >/dev/null
+    rm -f /tmp/plexmediaserver.deb
+
+    # Allow Plex to read the downloads/media folder.
+    usermod -a -G "$APP_GROUP" plex 2>/dev/null || true
+
+    systemctl enable plexmediaserver >/dev/null
+    systemctl start plexmediaserver
+    sleep 3
+
+    if systemctl is-active --quiet plexmediaserver; then
+        ok "plexmediaserver running"
+        warn "Plex WebUI (first-time setup): http://192.168.1.129:32400/web"
+        warn "Do NOT port-forward 32400 — access Plex only from your LAN or via its relay."
+        record_credential "Plex local WebUI" "http://192.168.1.129:32400/web"
+    else
+        warn "Plex did not start — check: journalctl -u plexmediaserver"
+    fi
+}
+
+# ---------------------------------------------------------------------------
 # Caddy + UFW
 # ---------------------------------------------------------------------------
 install_caddy() {
@@ -640,11 +756,13 @@ cmd_install_or_update() {
     preflight
     install_java
     create_user_and_dirs
+    install_storage
     ensure_env_file
     deploy_jar
     install_systemd_unit
     ensure_admin_password
     install_qbittorrent
+    install_plex
     install_caddy
     configure_ufw
     start_service
@@ -660,6 +778,9 @@ cmd_status() {
     echo
     echo "--- caddy.service ---"
     systemctl status caddy.service --no-pager --lines=5 2>&1 || true
+    echo
+    echo "--- plexmediaserver.service ---"
+    systemctl status plexmediaserver --no-pager --lines=3 2>&1 || true
     echo
     echo "--- listening sockets ---"
     ss -tlnp 2>/dev/null | grep -E ':(8085|8086|8080|443|80)\b' || echo "  (no matches)"
