@@ -23,6 +23,7 @@ APP_GROUP="homebox"
 APP_HOME="/var/lib/homebox"
 APP_OPT="/opt/homebox"
 APP_JAR="${APP_OPT}/server.jar"
+APP_WEB="${APP_OPT}/web"
 APP_DOWNLOADS="/srv/homebox/downloads"
 
 ETC_DIR="/etc/homebox"
@@ -249,6 +250,7 @@ create_user_and_dirs() {
     install -d -o "$APP_USER" -g "$APP_GROUP" -m 0750 "$APP_HOME/.config/myserver"
     install -d -o "$APP_USER" -g "$APP_GROUP" -m 0750 "$APP_DOWNLOADS"
     install -d -o root     -g root       -m 0755 "$APP_OPT"
+    install -d -o root     -g root       -m 0755 "$APP_WEB"
     install -d -o "$APP_USER" -g "$APP_GROUP" -m 0750 "$APP_LOG_DIR"
     ok "directories ready"
 }
@@ -300,6 +302,19 @@ deploy_jar() {
     [[ -n "$src" ]] || die "no server JAR found under $PAYLOAD_ROOT/lib or $SCRIPT_DIR"
     install -o root -g "$APP_GROUP" -m 0640 "$src" "$APP_JAR"
     ok "$(basename "$src") → $APP_JAR"
+}
+
+deploy_web() {
+    step "Deploy web UI"
+    local web_src
+    web_src="$(find "$PAYLOAD_ROOT/web" "$SCRIPT_DIR/web" -maxdepth 1 -name 'index.html' 2>/dev/null | head -n1 | xargs dirname 2>/dev/null || true)"
+    if [[ -z "$web_src" ]]; then
+        warn "no web UI files found — skipping (UI will not be served)"
+        return
+    fi
+    install -d -o root -g root -m 0755 "$APP_WEB"
+    cp -r "$web_src/." "$APP_WEB/"
+    ok "web UI → $APP_WEB"
 }
 
 install_systemd_unit() {
@@ -679,7 +694,9 @@ ${domain} {
         reverse_proxy 127.0.0.1:8085
     }
     handle {
-        reverse_proxy 127.0.0.1:8086
+        root * ${APP_WEB}
+        file_server
+        try_files {path} /index.html
     }
 
     log {
@@ -692,6 +709,9 @@ ${domain} {
 }
 EOF
     chmod 0644 "$CADDYFILE"
+    install -d -o caddy -g caddy -m 0755 /var/log/caddy
+    touch /var/log/caddy/access.log
+    chown caddy:caddy /var/log/caddy/access.log
     caddy validate --config "$CADDYFILE" >/dev/null || die "Caddyfile failed validation"
     systemctl enable caddy >/dev/null
     systemctl restart caddy
@@ -770,6 +790,7 @@ cmd_install_or_update() {
     install_storage
     ensure_env_file
     deploy_jar
+    deploy_web
     install_systemd_unit
     ensure_admin_password
     install_qbittorrent

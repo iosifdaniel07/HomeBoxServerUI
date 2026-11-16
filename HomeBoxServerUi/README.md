@@ -22,10 +22,17 @@ secrets, admin password. It is idempotent — safe to re-run for updates.
 
 ```bash
 # Requires JDK 17 (not 21/25 — Gradle 8.14 limitation)
+
+# Backend JAR
 JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64 ./gradlew :server:shadowJar
+
+# Web UI (WASM/JS static files)
+JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64 ./gradlew :composeApp:wasmJsBrowserDistribution
 ```
 
-Produces `server/build/libs/server-all.jar` (~21 MB, all dependencies bundled).
+Produces:
+- `server/build/libs/server-all.jar` (~21 MB, all dependencies bundled)
+- `composeApp/build/dist/wasmJs/productionExecutable/` (static web UI files)
 
 ### Step 2 — Copy to the server
 
@@ -36,6 +43,8 @@ SSH_PORT=2222
 
 scp -P $SSH_PORT server/build/libs/server-all.jar $SERVER:/tmp/
 scp -P $SSH_PORT server/install.sh $SERVER:/tmp/
+ssh -p $SSH_PORT $SERVER "mkdir -p /tmp/web-ui"
+scp -P $SSH_PORT -r composeApp/build/dist/wasmJs/productionExecutable/. $SERVER:/tmp/web-ui/
 ```
 
 ### Step 3 — Run the installer (first time only)
@@ -45,14 +54,20 @@ ssh -p $SSH_PORT $SERVER
 sudo bash /tmp/install.sh install
 ```
 
-### Step 4 — Update (JAR only, no full reinstall)
+### Step 4 — Update (without full reinstall)
 
 ```bash
+# Update backend JAR only
 scp -P $SSH_PORT server/build/libs/server-all.jar $SERVER:/tmp/
-ssh -p $SSH_PORT $SERVER \
-  "sudo systemctl stop homebox-media && \
-   sudo cp /tmp/server-all.jar /opt/homebox-media/server.jar && \
-   sudo systemctl start homebox-media"
+ssh -t -p $SSH_PORT $SERVER \
+  "sudo systemctl stop homebox && \
+   sudo cp /tmp/server-all.jar /opt/homebox/server.jar && \
+   sudo systemctl start homebox"
+
+# Update web UI only
+ssh -p $SSH_PORT $SERVER "mkdir -p /tmp/web-ui"
+scp -P $SSH_PORT -r composeApp/build/dist/wasmJs/productionExecutable/. $SERVER:/tmp/web-ui/
+ssh -t -p $SSH_PORT $SERVER "sudo cp -r /tmp/web-ui/. /opt/homebox/web/"
 ```
 
 The wizard asks you, in order:
