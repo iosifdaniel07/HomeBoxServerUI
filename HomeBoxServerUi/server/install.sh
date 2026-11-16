@@ -333,7 +333,6 @@ ProtectControlGroups=true
 ProtectClock=true
 ProtectHostname=true
 LockPersonality=true
-MemoryDenyWriteExecute=true
 RestrictRealtime=true
 RestrictSUIDSGID=true
 RestrictNamespaces=true
