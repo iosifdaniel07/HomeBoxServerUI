@@ -662,17 +662,26 @@ install_plex() {
     rm -f /tmp/plexmediaserver.deb
 
     # Allow Plex to read the downloads/media folder.
-    usermod -a -G "$APP_GROUP" plex 2>/dev/null || true
+    usermod -a -G "$MEDIA_GROUP" plex 2>/dev/null || true
 
     systemctl enable plexmediaserver >/dev/null
     systemctl start plexmediaserver
     sleep 3
 
+    # Open Plex port for LAN only (never the internet).
+    local lan_ip; lan_ip="$(hostname -I | awk '{print $1}')"
+    local lan_subnet; lan_subnet="${lan_ip%.*}.0/24"
+    if command -v ufw >/dev/null 2>&1; then
+        ufw allow from "$lan_subnet" to any port 32400 proto tcp comment "Plex LAN" >/dev/null 2>&1 || true
+        ufw reload >/dev/null 2>&1 || true
+        ok "UFW: port 32400 open for LAN ($lan_subnet)"
+    fi
+
     if systemctl is-active --quiet plexmediaserver; then
         ok "plexmediaserver running"
-        warn "Plex WebUI (first-time setup): http://192.168.1.129:32400/web"
+        ok "Plex WebUI (first-time setup): http://${lan_ip}:32400/web"
         warn "Do NOT port-forward 32400 — access Plex only from your LAN or via its relay."
-        record_credential "Plex local WebUI" "http://192.168.1.129:32400/web"
+        record_credential "Plex local WebUI" "http://${lan_ip}:32400/web"
     else
         warn "Plex did not start — check: journalctl -u plexmediaserver"
     fi
