@@ -319,7 +319,7 @@ WorkingDirectory=${APP_HOME}
 EnvironmentFile=${ENV_FILE}
 EnvironmentFile=-${ADMIN_ENV_FILE}
 
-ExecStart=/usr/bin/java -jar ${APP_JAR}
+ExecStart=/usr/bin/java -Duser.home=${APP_HOME} -jar ${APP_JAR}
 
 # --- Sandbox ---
 NoNewPrivileges=true
