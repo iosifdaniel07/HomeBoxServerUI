@@ -372,8 +372,19 @@ ensure_admin_password() {
     source "$ENV_FILE"
     set +a
 
-    sudo -u "$APP_USER" --preserve-env \
+    sudo -u "$APP_USER" \
         env HOME="$APP_HOME" \
+            SESSION_ENCRYPT_KEY_HEX="${SESSION_ENCRYPT_KEY_HEX}" \
+            SESSION_SIGN_KEY_HEX="${SESSION_SIGN_KEY_HEX}" \
+            SETTINGS_ENC_KEY_HEX="${SETTINGS_ENC_KEY_HEX}" \
+            ADMIN_USERNAME="${ADMIN_USERNAME}" \
+            APP_ENV="${APP_ENV}" \
+            HOMEBOX_DOWNLOAD_FOLDER="${HOMEBOX_DOWNLOAD_FOLDER}" \
+            HOMEBOX_SETTINGS_FILE="${HOMEBOX_SETTINGS_FILE}" \
+            HOMEBOX_AUDIT_LOG="${HOMEBOX_AUDIT_LOG}" \
+            HOMEBOX_HOST="${HOMEBOX_HOST}" \
+            HOMEBOX_PORT="${HOMEBOX_PORT}" \
+            HOMEBOX_QBITTORRENT_URL="${HOMEBOX_QBITTORRENT_URL}" \
         /usr/bin/java -jar "$APP_JAR" || true
 
     if [[ -f "$ADMIN_ENV_FILE" ]] && grep -q '^ADMIN_PASSWORD_ARGON2ID=' "$ADMIN_ENV_FILE"; then
