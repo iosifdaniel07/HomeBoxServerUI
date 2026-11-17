@@ -298,6 +298,7 @@ class FilelistClient {
     }
 
     suspend fun fetchImage(url: String): ByteArray? = try {
+        ensureLoggedIn()
         val response = client.get(url) { browseHeaders() }
         if (response.status.isSuccess()) response.body<ByteArray>() else null
     } catch (e: Exception) {

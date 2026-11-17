@@ -157,8 +157,17 @@ fun DiskSpaceScreen(onMenuSelected: (screen: Screen) -> Unit) {
 
                         error != null -> ErrorBanner(message = error!!, onRetry = { refresh() })
                         else -> {
-                            data?.let {
-                                FilesystemCard(it)
+                            Column {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Spacer(Modifier.weight(1f))
+                                    TextButton(onClick = { refresh() }, enabled = !loading) {
+                                        Text(if (loading) "Loading..." else "Refresh")
+                                    }
+                                }
+                                data?.let { FilesystemCard(it) }
                             }
                         }
                     }
@@ -178,10 +187,7 @@ fun DiskSpaceScreen(onMenuSelected: (screen: Screen) -> Unit) {
                     Text(
                         text = "Files",
                         style = MaterialTheme.typography.titleMedium,
-                        modifier = Modifier.padding(
-                            start = 14.dp,
-                            bottom = 8.dp
-                        ) // Adds space between the label and the card
+                        modifier = Modifier.padding(start = 14.dp, bottom = 8.dp)
                     )
                 }
                 items(items = items) { fileEntry ->

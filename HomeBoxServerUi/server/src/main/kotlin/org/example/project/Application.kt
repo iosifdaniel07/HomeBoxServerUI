@@ -379,6 +379,27 @@ fun Application.module() {
             }
         }
 
+        get("/api/proxyImage") {
+            val url = call.request.queryParameters["url"]
+            val allowed = listOf("https://filelist.io/", "https://image.tmdb.org/", "https://www.themoviedb.org/")
+            if (url.isNullOrBlank() || allowed.none { url.startsWith(it) }) {
+                call.application.log.warn("proxyImage rejected url=[{}]", url)
+                call.respond(HttpStatusCode.BadRequest)
+                return@get
+            }
+            val bytes = withContext(Dispatchers.IO) { filelistClient.fetchImage(url) }
+            if (bytes == null) {
+                call.respond(HttpStatusCode.NotFound)
+                return@get
+            }
+            val contentType = when {
+                url.endsWith(".jpg", ignoreCase = true) || url.endsWith(".jpeg", ignoreCase = true) -> ContentType.Image.JPEG
+                url.endsWith(".png", ignoreCase = true) -> ContentType.Image.PNG
+                else -> ContentType.Image.JPEG
+            }
+            call.respondBytes(bytes, contentType)
+        }
+
         // --- Authenticated endpoints --------------------------------------
         authenticate(ADMIN_SESSION) {
 
@@ -507,25 +528,6 @@ fun Application.module() {
                 val isInstalled =
                     withContext(Dispatchers.IO) { QBittorrentUtils.isQbittorrentRunning() }
                 call.respond(isInstalled)
-            }
-
-            get("/api/proxyImage") {
-                val url = call.request.queryParameters["url"]
-                if (url.isNullOrBlank() || !url.startsWith("https://filelist.io/")) {
-                    call.respond(HttpStatusCode.BadRequest)
-                    return@get
-                }
-                val bytes = withContext(Dispatchers.IO) { filelistClient.fetchImage(url) }
-                if (bytes == null) {
-                    call.respond(HttpStatusCode.NotFound)
-                    return@get
-                }
-                val contentType = when {
-                    url.endsWith(".jpg", ignoreCase = true) || url.endsWith(".jpeg", ignoreCase = true) -> ContentType.Image.JPEG
-                    url.endsWith(".png", ignoreCase = true) -> ContentType.Image.PNG
-                    else -> ContentType.Image.JPEG
-                }
-                call.respondBytes(bytes, contentType)
             }
 
             post("/api/downloadFile") {
