@@ -31,6 +31,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import org.example.project.searchData.SearchItem
+import org.example.project.Client
 
 @Composable
 fun ItemCardView(item: SearchItem, onDownloadItem: (item: SearchItem) -> Unit) {
@@ -70,7 +71,7 @@ fun ItemCardView(item: SearchItem, onDownloadItem: (item: SearchItem) -> Unit) {
                         AsyncImage(
                             modifier = Modifier
                                 .aspectRatio(185f / 278f),
-                            model = item.imageUrl,
+                            model = "${Client.host}/proxyImage?url=${item.imageUrl}",
                             contentDescription = null,
                             contentScale = ContentScale.Crop
 

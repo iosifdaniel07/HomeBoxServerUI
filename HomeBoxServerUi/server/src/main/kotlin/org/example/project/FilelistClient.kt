@@ -297,6 +297,14 @@ class FilelistClient {
         }
     }
 
+    suspend fun fetchImage(url: String): ByteArray? = try {
+        val response = client.get(url) { browseHeaders() }
+        if (response.status.isSuccess()) response.body<ByteArray>() else null
+    } catch (e: Exception) {
+        log.debug("fetchImage failed for {}: {}", url, e.javaClass.simpleName)
+        null
+    }
+
     /**
      * Close the HTTP client and release resources
      */
