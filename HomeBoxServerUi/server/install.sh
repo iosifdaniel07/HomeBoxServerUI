@@ -303,7 +303,7 @@ deploy_jar() {
     local src
     src="$(find "$PAYLOAD_ROOT/lib" "$SCRIPT_DIR" -maxdepth 1 \( -name '*-all.jar' -o -name 'server-*.jar' \) 2>/dev/null | head -n1 || true)"
     [[ -n "$src" ]] || die "no server JAR found under $PAYLOAD_ROOT/lib or $SCRIPT_DIR"
-    install -o root -g "$APP_GROUP" -m 0640 "$src" "$APP_JAR"
+    install -o root -g "$MEDIA_GROUP" -m 0640 "$src" "$APP_JAR"
     ok "$(basename "$src") → $APP_JAR"
 }
 

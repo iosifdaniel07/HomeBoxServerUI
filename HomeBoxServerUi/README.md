@@ -418,3 +418,28 @@ Check two places:
 ## License
 
 Not set. Add one if you plan to publish.
+
+## Manual steps(dont delete)
+builds:
+cd "/home/iosifdaniel07/Personal P/HomeBoxServerUI/HomeBoxServerUi"
+
+JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64 ./gradlew :server:shadowJar
+
+JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64 ./gradlew :composeApp:wasmJsBrowserDistribution
+
+Asta e tot. Producele sunt în:
+- server/build/libs/server-all.jar
+- composeApp/build/dist/wasmJs/productionExecutable/
+
+on pc:
+scp -P 2222 "/home/iosifdaniel07/Personal P/HomeBoxServerUI/HomeBoxServerUi/server/build/libs/server-all.jar" homebox@homestreambox.go.ro:/tmp/
+ssh -p 2222 homebox@homestreambox.go.ro "mkdir -p /tmp/web-ui"
+scp -P 2222 -r "/home/iosifdaniel07/Personal P/HomeBoxServerUI/HomeBoxServerUi/composeApp/build/dist/wasmJs/productionExecutable/." homebox@homestreambox.go.ro:/tmp/web-ui/ 
+
+on server:
+sudo cp /tmp/server-all.jar /opt/homebox/server.jar
+sudo chown root:media /opt/homebox/server.jar
+sudo chmod 0640 /opt/homebox/server.jar
+sudo cp -r /tmp/web-ui/. /opt/homebox/web/
+sudo systemctl start homebox
+sudo systemctl status homebox --no-pager      
