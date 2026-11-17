@@ -60,21 +60,32 @@ sudo bash /tmp/install.sh install
 
 ### Step 4 — Update (without full reinstall)
 
-```bash
-# Rebuild everything
-JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64 ./gradlew :server:shadowJar :composeApp:wasmJsBrowserDistribution
+**On your dev machine** — build:
 
-# Copy to server
+```bash
+JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64 ./gradlew :server:shadowJar
+JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64 ./gradlew :composeApp:wasmJsBrowserDistribution
+```
+
+**On your dev machine** — copy to server (run each line separately):
+
+```bash
+SERVER=homebox@192.168.1.129
+SSH_PORT=2222
+
 scp -P $SSH_PORT server/build/libs/server-all.jar $SERVER:/tmp/
 ssh -p $SSH_PORT $SERVER "mkdir -p /tmp/web-ui"
 scp -P $SSH_PORT -r composeApp/build/dist/wasmJs/productionExecutable/. $SERVER:/tmp/web-ui/
+```
 
-# Deploy and restart (run on server)
-ssh -p $SSH_PORT $SERVER \
-  "sudo systemctl stop homebox && \
-   sudo cp /tmp/server-all.jar /opt/homebox/server.jar && \
-   sudo cp -r /tmp/web-ui/. /opt/homebox/web/ && \
-   sudo systemctl start homebox"
+**On the server** — deploy and restart (run each line separately):
+
+```bash
+sudo systemctl stop homebox
+sudo cp /tmp/server-all.jar /opt/homebox/server.jar
+sudo cp -r /tmp/web-ui/. /opt/homebox/web/
+sudo systemctl start homebox
+sudo systemctl status homebox --no-pager
 ```
 
 The wizard asks you, in order:
