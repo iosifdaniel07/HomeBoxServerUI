@@ -443,3 +443,6 @@ sudo chmod 0640 /opt/homebox/server.jar
 sudo cp -r /tmp/web-ui/. /opt/homebox/web/
 sudo systemctl start homebox
 sudo systemctl status homebox --no-pager      
+
+check state:
+sudo journalctl -u homebox.service -f --no-pager
