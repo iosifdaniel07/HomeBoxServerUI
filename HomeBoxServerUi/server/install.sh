@@ -331,7 +331,7 @@ Wants=network-online.target
 [Service]
 Type=simple
 User=${APP_USER}
-Group=${APP_GROUP}
+Group=${MEDIA_GROUP}
 WorkingDirectory=${APP_HOME}
 
 EnvironmentFile=${ENV_FILE}
